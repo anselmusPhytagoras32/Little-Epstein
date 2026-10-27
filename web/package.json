@@ -1,0 +1,37 @@
+{
+    "name":  "get-out-november",
+    "version":  "1.0.0",
+    "description":  "A friendly November survival game with daily check-ins and private rooms.",
+    "private":  true,
+    "packageManager":  "pnpm@10.30.3",
+    "scripts":  {
+                    "dev":  "next dev",
+                    "build":  "next build",
+                    "start":  "next start -H 0.0.0.0",
+                    "lint":  "eslint app lib scripts",
+                    "ui:check": "node scripts/ui-check.mjs",
+                    "db:migrate":  "node scripts/migrate.mjs",
+                    "push:keys":  "node scripts/generate-vapid.mjs",
+                    "sweep":  "node scripts/sweep.mjs"
+                },
+    "dependencies":  {
+                         "next":  "16.3.4",
+                         "react":  "19.2.6",
+                         "react-dom":  "19.2.6",
+                         "lucide-react":  "1.61.0",
+                         "pg":  "8.23.1",
+                         "bcryptjs":  "3.0.3",
+                         "web-push":  "3.6.7"
+                     },
+    "devDependencies":  {
+                            "@types/node":  "22.19.19",
+                            "@types/react":  "19.2.14",
+                            "@types/react-dom":  "19.2.3",
+                            "@types/pg":  "8.23.1",
+                            "@types/web-push":  "3.6.4",
+                            "typescript":  "5.9.3",
+                            "eslint":  "9.39.4",
+                            "eslint-config-next":  "16.3.4"
+                        },
+    "type":  "module"
+}

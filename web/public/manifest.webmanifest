@@ -1,0 +1,43 @@
+{
+  "id": "/",
+  "name": "Escape the Epstein",
+  "short_name": "The Escape",
+  "description": "A daily check-in streak game for your crew.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait",
+  "background_color": "#fcfaf4",
+  "theme_color": "#fcfaf4",
+  "categories": ["games", "lifestyle"],
+  "screenshots": [
+    {
+      "src": "/screenshots/app-phone.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Daily streak and escape route"
+    }
+  ],
+  "icons": [
+    {
+      "src": "/icons/escape-app-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/escape-app-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/escape-app.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
