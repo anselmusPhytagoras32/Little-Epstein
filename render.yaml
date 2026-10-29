@@ -35,3 +35,15 @@ services:
         sync: false
       - key: VAPID_SUBJECT
         sync: false
+
+  - type: cron
+    name: escape-the-epstein-keepalive
+    runtime: node
+    plan: starter
+    rootDir: web
+    schedule: "*/14 * * * *"
+    buildCommand: corepack pnpm@10.30.3 install --frozen-lockfile
+    startCommand: corepack pnpm@10.30.3 keepalive
+    envVars:
+      - key: WEB_URL
+        sync: false

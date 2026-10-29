@@ -56,6 +56,8 @@ Reminder times alone do not grant notification permission. Players opt in under 
 4. For optional push reminders, generate keys with `corepack pnpm@10.30.3 push:keys`. Set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT` on both Render services. Use a real contact address in `VAPID_SUBJECT`; keep the private key out of source and chat.
 5. Open the deployed app, create an account, and choose a reminder under **Settings**. Enable background reminders separately on each device.
 
+The Blueprint also defines a keep-alive cron that requests the web service every 14 minutes. Set its `WEB_URL` to the service's HTTPS `onrender.com` URL in Render. This is useful only for a Free web service, which otherwise spins down after 15 minutes without inbound traffic. Render cron jobs have a $1/month minimum charge; a paid web service does not need this ping.
+
 Without VAPID keys, check-ins and scheduled elimination still work. A saved reminder preference does not send a background notification until the owner configures VAPID and the player grants permission.
 
 ## Commands
@@ -73,5 +75,6 @@ Without VAPID keys, check-ins and scheduled elimination still work. A saved remi
 | `corepack pnpm@10.30.3 exec tsc --noEmit` | Check TypeScript types. |
 | `corepack pnpm@10.30.3 db:migrate` | Apply the Neon schema. |
 | `corepack pnpm@10.30.3 sweep` | Process missed days, winners, and opted-in reminders. |
+| `corepack pnpm@10.30.3 keepalive` | Request the configured `WEB_URL`; used by Render's 14-minute keep-alive cron. |
 
 The browser check needs Chrome launched with `--remote-debugging-port=9223` and a separate `--user-data-dir`. It uses isolated test storage and intercepts its authentication failure request, so it creates no real accounts. Set `APP_URL` to the preview origin; set `UI_CHECK_PWA=1` to check offline navigation against a production build. Captures are written to `../.impeccable/review/`.
