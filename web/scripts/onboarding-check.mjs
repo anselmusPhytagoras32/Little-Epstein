@@ -88,7 +88,19 @@ try {
   await waitFor(page, "location.pathname === '/' && !document.querySelector('.onboarding') && !!document.querySelector('.escape-screen')", 'local practice after deferring account creation');
   result = await page.send('Runtime.evaluate', { expression: "!!document.querySelector('.dock-primary-cta')", returnByValue: true });
   assert.equal(result.result.value, true, 'practice island presents its daily action');
-  console.log('Onboarding progress, solo/crew choice, and deferred-account practice flow passed.');
+  result = await page.send('Runtime.evaluate', {
+    expression: "({markers:document.querySelectorAll('.map-crew-marker').length,self:document.querySelectorAll('.map-self-avatar').length})",
+    returnByValue: true,
+  });
+  assert.deepEqual(result.result.value, { markers: 0, self: 1 }, 'solo practice shows only the real local player');
+  await page.send('Page.navigate', { url: new URL('/crew', app).href });
+  await waitFor(page, "!!document.querySelector('.crew-screen')", 'solo crew page');
+  result = await page.send('Runtime.evaluate', {
+    expression: "({solo:document.querySelector('.crew-screen').textContent.includes('solo practice'),players:document.querySelectorAll('.crew-roster .member-row').length,names:/Kai|Maya|Leo|Zara/.test(document.querySelector('.crew-screen').textContent)})",
+    returnByValue: true,
+  });
+  assert.deepEqual(result.result.value, { solo: true, players: 1, names: false }, 'solo crew page contains only the real player and no fabricated friends');
+  console.log('Onboarding progress, solo/crew choice, deferred account, and empty solo crew passed.');
 } finally {
   if (browser && context) await browser.send('Target.disposeBrowserContext', { browserContextId: context });
   page?.close();

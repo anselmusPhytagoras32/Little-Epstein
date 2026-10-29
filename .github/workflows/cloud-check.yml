@@ -1,0 +1,105 @@
+name: Cloud confidence
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cloud-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: escape_test
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d escape_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/escape_test
+      BOSS_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/escape_test
+      APP_URL: http://127.0.0.1:3000
+      CHROME_DEBUG_URL: http://127.0.0.1:9223
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.30.3
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Type check
+        run: pnpm exec tsc --noEmit
+
+      - name: Production build
+        run: pnpm build
+
+      - name: Apply migrations twice
+        run: |
+          pnpm db:migrate
+          pnpm db:migrate
+
+      - name: Install Chrome
+        id: chrome
+        uses: browser-actions/setup-chrome@v2
+        with:
+          install-dependencies: true
+
+      - name: Start production app
+        run: |
+          pnpm start > /tmp/escape-app.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3000/ > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/escape-app.log
+          exit 1
+
+      - name: Start isolated headless Chrome
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: |
+          "$CHROME_BIN" --headless=new --no-sandbox --disable-dev-shm-usage --disable-gpu \
+            --no-first-run --no-default-browser-check --remote-debugging-port=9223 \
+            --user-data-dir=/tmp/escape-chrome about:blank > /tmp/escape-chrome.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:9223/json/version > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/escape-chrome.log
+          exit 1
+
+      - name: Check onboarding and solo crew
+        run: node scripts/onboarding-check.mjs
+
+      - name: Check boss fight
+        run: node scripts/boss-check.mjs
+
+      - name: Check authenticated multiplayer lobby against PostgreSQL
+        run: node scripts/boss-lobby-check.mjs

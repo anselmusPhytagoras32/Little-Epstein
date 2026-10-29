@@ -78,3 +78,5 @@ Without VAPID keys, check-ins and scheduled elimination still work. A saved remi
 | `corepack pnpm@10.30.3 keepalive` | Request the configured `WEB_URL`; used by Render's 14-minute keep-alive cron. |
 
 The browser check needs Chrome launched with `--remote-debugging-port=9223` and a separate `--user-data-dir`. It uses isolated test storage and intercepts its authentication failure request, so it creates no real accounts. Set `APP_URL` to the preview origin; set `UI_CHECK_PWA=1` to check offline navigation against a production build. Captures are written to `../.impeccable/review/`.
+
+The **Cloud confidence** GitHub Actions workflow runs lint, TypeScript, the production build, repeatable migrations, first-run and boss browser flows, and authenticated lobby integration against a disposable PostgreSQL database on pushes to `main` and pull requests. It uses throwaway players and a temporary local database; it does not need Neon credentials or write to production.
