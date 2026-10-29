@@ -20,7 +20,7 @@ type InstallPromptEvent = Event & {
 };
 
 type SessionResponse = {
-  user: { username: string; avatarId?: AvatarId; avatarAccent?: AvatarAccent; timezone?: string; reminder?: string | null; remindersEnabled?: boolean };
+  user: { username: string; avatarId?: AvatarId; avatarAccent?: AvatarAccent; timezone?: string; reminder?: string | null; remindersEnabled?: boolean } | null;
   room: OnlineRoom | null;
 };
 
@@ -167,6 +167,16 @@ export function GameProvider({ initialNow, children }: { initialNow: string; chi
         } else throw error;
       }
       if (!mounted.current || version !== refreshVersion.current) return;
+      if (!session.user) {
+        const previouslySignedIn = authenticated.current;
+        authenticated.current = false;
+        setOnlineRoom(null);
+        setOnlineUsername("");
+        setMode("practice");
+        removeStorage(PREVIEW_KEY);
+        if (previouslySignedIn) setNotice("Your session has expired. Sign in to reconnect with your crew.");
+        return;
+      }
       authenticated.current = true;
       setOnlineUsername(session.user.username);
       setOnlineAvatar(avatarOrDefault(session.user.avatarId));

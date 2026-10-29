@@ -6,6 +6,7 @@ import { Check, Compass, Flame, Settings2, UsersRound, WifiOff, X } from "lucide
 import { useEffect, useRef, useSyncExternalStore, type MouseEvent, type ReactNode } from "react";
 import { useGame } from "./game-provider";
 import Onboarding from "./onboarding";
+import AppStartupLoader from "./app-startup-loader";
 
 const tabs = [
   { href: "/", label: "Escape", icon: Compass },
@@ -71,10 +72,11 @@ export default function AppShell({ children }: { children: ReactNode }) {
   }
 
   if (pathname.startsWith("/boss")) return <>{children}</>;
-  if (onboardingDone === null || (!onboardingDone && !game.ready)) return <div className="app-shell onboarding-loading" aria-label="Loading" />;
+  if (onboardingDone === null || (!onboardingDone && !game.ready)) return <AppStartupLoader />;
   if (!onboardingDone) return <div className="app-shell"><Onboarding onFinish={finishOnboarding} /></div>;
 
   return <div className="app-shell" onClickCapture={navigateOffline}>
+    <AppStartupLoader />
     <a className="skip-link" href="#page-content">Skip to content</a>
     {!game.online && <div className="connection-banner" role="status"><WifiOff size={14}/> Offline. Online check-ins need a connection.</div>}
     <main ref={main} id="page-content" className={`page-main${mapPage ? " is-map" : ""}`} tabIndex={-1}>{children}</main>

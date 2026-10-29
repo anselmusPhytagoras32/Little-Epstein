@@ -111,7 +111,8 @@
   border-radius: 4px;
   background: linear-gradient(90deg, #10b981 0%, #34d399 70%, #6ee7b7 100%);
   box-shadow: 0 0 8px rgba(52, 211, 153, 0.6);
-  transition: width 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: left;
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .boss-health b {
@@ -894,36 +895,674 @@
 .boss-screen { background: #07545b; color: #e8f4df; }
 .boss-hud { background: #07545b; border-color: #a1cca6; box-shadow: 0 4px 12px #06383c55; }
 .boss-playfield { border-color: #a1cca6; }
-.boss-intro { place-items: start center; background: #07545b; backdrop-filter: none; }
-.boss-intro-card { align-self: start; max-width: 610px; max-height: 100%; gap: 10px; overflow-y: auto; text-align: left; background: #dff0dc; color: #103d41; border: 0; border-radius: 16px; box-shadow: 0 8px 24px #05383e55; }
-.boss-kicker { color: #07545b; letter-spacing: .04em; }
-.boss-opponents-picker { justify-content: flex-start; margin: 0; }
-.boss-opponent-tab { min-height: 40px; background: #bfe5cf; color: #103d41; border-color: #80bca5; }
-.boss-opponent-tab small { background: #dff0dc; color: #07545b; }
-.boss-opponent-tab.active { background: #07545b; color: #fff; border-color: #07545b; box-shadow: none; }
-.boss-opponent-tab.active small { background: #f9d779; color: #103d41; }
-.boss-intro h1 { color: #103d41; text-shadow: none; }
-.boss-intro p, .boss-intro p.boss-small { max-width: none; margin: 0; color: #285456; }
-.boss-intro p.boss-error { color: #812f22; }
-.boss-brief { display: flex; flex-wrap: wrap; gap: 8px; }
-.boss-brief span { display: inline-flex; align-items: center; gap: 6px; padding: 6px 9px; border-radius: 8px; background: #f9d779; color: #103d41; font-size: 12px; font-weight: 750; }
-.raid-lobby { display: grid; gap: 8px; padding: 12px; border-radius: 12px; background: #bfe5cf; }
-.raid-lobby-heading { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: #103d41; }
-.raid-lobby-heading strong { display: flex; align-items: center; gap: 6px; }
-.raid-lobby-players { display: flex; flex-wrap: wrap; gap: 8px; }
-.raid-lobby-player { display: flex; align-items: center; gap: 6px; padding: 4px 8px 4px 4px; border-radius: 9px; background: #dff0dc; color: #103d41; font-size: 12px; font-weight: 700; }
-.raid-leave { justify-self: start; min-height: 36px; border: 0; background: transparent; color: #07545b; font-weight: 750; text-decoration: underline; }
-.raid-join, .boss-start { display: flex; min-height: 44px; align-items: center; justify-content: center; gap: 8px; border: 1px solid #765a20; border-radius: 12px; background: #f9d779; color: #103d41; font-size: 14px; font-weight: 800; box-shadow: none; }
-.raid-join { background: #bfe5cf; border-color: #07545b; }
-.raid-join:disabled, .boss-start:disabled { opacity: .55; }
-.boss-exit { color: #07545b; }
-.boss-dialogue { position: absolute; z-index: 60; inset: 0; display: grid; grid-template-rows: minmax(100px, 1fr) auto; background: #23ced9; }
-.boss-dialogue-art { display: grid; place-items: end center; min-height: 0; background: #23ced9; }
-.boss-playfield .boss-dialogue-art canvas { width: auto; height: min(100%, 150px); aspect-ratio: 120 / 130; object-fit: contain; }
-.boss-dialogue-box { display: grid; gap: 7px; padding: 15px 22px; border-top: 1px solid #f9d779; background: #07545b; color: #fff; }
-.boss-dialogue-box strong { color: #f9d779; font-size: 14px; letter-spacing: .06em; }
-.boss-dialogue-box p { margin: 0; color: #fff; font-size: 16px; font-weight: 700; line-height: 1.4; }
-.boss-dialogue-box button { display: inline-flex; align-items: center; gap: 6px; justify-self: end; min-height: 40px; padding: 6px 14px; border: 0; border-radius: 8px; background: #f9d779; color: #103d41; font-weight: 800; }
+/* Tactical Battle Stage Briefing Card */
+.boss-intro {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-y: auto;
+  padding: clamp(12px, 3vh, 28px);
+  background:
+    radial-gradient(circle at 50% 35%, rgba(17, 87, 100, 0.45) 0%, rgba(6, 36, 44, 0.9) 100%),
+    url('/images/island-board-v2.webp') center 40% / cover no-repeat;
+  backdrop-filter: blur(4px);
+  z-index: 50;
+  animation: boss-intro-fade 0.25s ease-out;
+}
+
+@keyframes boss-intro-fade {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.boss-intro-card {
+  position: relative;
+  width: min(100%, 780px);
+  max-height: 94%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: clamp(18px, 3vw, 26px);
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(8, 48, 54, 0.96) 0%, rgba(5, 30, 35, 0.98) 100%);
+  border: 2px solid rgba(249, 215, 121, 0.4);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.65),
+    0 4px 14px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  color: #e8f4df;
+  box-sizing: border-box;
+  overflow-y: auto;
+}
+
+/* Stage Selector Tabs */
+.boss-opponents-picker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 0;
+}
+
+.boss-opponent-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 6px 14px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #dff0dc;
+  font-size: 13px;
+  font-weight: 750;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.boss-opponent-tab:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(249, 215, 121, 0.4);
+  transform: translateY(-1px);
+}
+
+.boss-opponent-tab.active {
+  background: #f9d779;
+  border-color: #f9d779;
+  color: #073b43;
+  font-weight: 850;
+  box-shadow: 0 4px 14px rgba(249, 215, 121, 0.35);
+}
+
+.boss-opponent-tab small {
+  font-size: 10px;
+  font-weight: 750;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.16);
+  color: currentColor;
+}
+
+/* Split Stage Layout */
+.boss-stage-body {
+  display: grid;
+  grid-template-columns: 210px 1fr;
+  gap: 20px;
+  align-items: center;
+}
+
+/* Left: Boss Visual Showcase */
+.boss-preview-pane {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 12px;
+  border-radius: 18px;
+  background: radial-gradient(circle at 50% 60%, rgba(35, 206, 217, 0.12) 0%, rgba(4, 24, 28, 0.65) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.4);
+}
+
+.boss-preview-canvas-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.boss-playfield .boss-preview-pane .boss-dialogue-canvas {
+  display: block;
+  width: auto;
+  height: min(22vh, 160px);
+  aspect-ratio: 360 / 400;
+  object-fit: contain;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.65));
+  animation: boss-dialogue-bob 3.2s ease-in-out infinite;
+}
+
+.boss-preview-info {
+  text-align: center;
+}
+
+.boss-preview-title {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.boss-preview-name {
+  margin: 2px 0 0;
+  font-size: 19px;
+  font-weight: 900;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+}
+
+/* Right: Mission Briefing */
+.boss-mission-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.boss-mission-heading h1 {
+  margin: 0 0 4px 0;
+  font-size: clamp(20px, 3.2vw, 24px);
+  font-weight: 900;
+  color: #ffffff;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.boss-mission-desc {
+  margin: 0;
+  color: #bfe5cf;
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+
+.boss-tactical-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.boss-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e8f4df;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.boss-badge svg {
+  color: #f9d779;
+}
+
+/* Combat Results Grid */
+.boss-results {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.boss-result-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 2px;
+}
+
+.boss-result-stat strong {
+  font-size: 15px;
+  font-weight: 850;
+  color: #f9d779;
+  font-variant-numeric: tabular-nums;
+}
+
+.boss-result-stat span {
+  font-size: 10.5px;
+  color: #a1cca6;
+  font-weight: 600;
+}
+
+/* Raid Lobby */
+.raid-lobby {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.raid-lobby-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: #f9d779;
+}
+
+.raid-lobby-heading strong {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 800;
+}
+
+.raid-lobby-players {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.raid-lobby-player {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px 4px 4px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.raid-leave {
+  justify-self: start;
+  min-height: 28px;
+  border: 0;
+  background: transparent;
+  color: #fca47c;
+  font-size: 12px;
+  font-weight: 750;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+}
+
+.raid-join, .boss-start {
+  display: inline-flex;
+  min-height: 46px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid #765a20;
+  border-radius: 9999px;
+  background: linear-gradient(180deg, #fce59f 0%, #f9d779 100%);
+  color: #103d41;
+  font-size: 15px;
+  font-weight: 850;
+  box-shadow:
+    0 4px 0 #805c1b,
+    0 8px 18px rgba(0, 0, 0, 0.28);
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.raid-join {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  box-shadow: none;
+}
+
+.raid-join:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.boss-start:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow:
+    0 5px 0 #805c1b,
+    0 10px 22px rgba(0, 0, 0, 0.32);
+}
+
+.boss-start:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow:
+    0 1px 0 #805c1b,
+    0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.boss-start:disabled, .raid-join:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.boss-start:focus-visible, .raid-join:focus-visible {
+  outline: 3px solid #f9d779;
+  outline-offset: 2px;
+}
+
+.boss-error {
+  margin: 0;
+  color: #fca47c;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* Footer: Controls & Exit Link */
+.boss-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.boss-controls-hint {
+  margin: 0;
+  color: #a1cca6;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.boss-controls-hint span {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.boss-exit {
+  color: #bfe5cf;
+  font-size: 12.5px;
+  font-weight: 750;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.boss-exit:hover {
+  color: #f9d779;
+}
+
+@media (max-width: 680px) {
+  .boss-stage-body {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    text-align: center;
+  }
+  .boss-preview-pane {
+    padding: 10px;
+  }
+  .boss-playfield .boss-preview-pane .boss-dialogue-canvas {
+    height: min(18vh, 120px);
+  }
+  .boss-tactical-badges {
+    justify-content: center;
+  }
+  .boss-card-footer {
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+}
+
+@media (max-height: 520px) {
+  .boss-intro-card {
+    gap: 10px;
+    padding: 12px 18px;
+  }
+  .boss-playfield .boss-preview-pane .boss-dialogue-canvas {
+    height: min(20vh, 110px);
+  }
+  .boss-mission-heading h1 {
+    font-size: 18px;
+  }
+  .boss-mission-desc {
+    font-size: 12px;
+  }
+  .boss-start {
+    min-height: 40px;
+    padding: 8px 20px;
+    font-size: 14px;
+  }
+}
+/* Pokémon-Style Boss Encounter Dialogue */
+.boss-dialogue {
+  position: absolute;
+  z-index: 60;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  background:
+    radial-gradient(circle at 50% 32%, rgba(17, 87, 100, 0.42) 0%, rgba(6, 36, 44, 0.88) 100%),
+    url('/images/island-board-v2.webp') center 40% / cover no-repeat;
+  overflow: hidden;
+  animation: boss-dialogue-fade 0.25s ease-out;
+}
+
+@keyframes boss-dialogue-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.boss-dialogue-art {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  min-height: 0;
+  padding-bottom: 8px;
+  position: relative;
+}
+
+.boss-playfield .boss-dialogue-art .boss-dialogue-canvas {
+  display: block;
+  width: auto;
+  height: min(52vh, 360px);
+  aspect-ratio: 360 / 400;
+  object-fit: contain;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  filter: drop-shadow(0 14px 28px rgba(0, 0, 0, 0.65));
+  animation: boss-dialogue-bob 3.2s ease-in-out infinite;
+}
+
+@keyframes boss-dialogue-bob {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.boss-dialogue-bubble-wrap {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  padding: 0 16px 20px 16px;
+  box-sizing: border-box;
+  z-index: 2;
+}
+
+/* Floating Pokémon Speech Bubble */
+.boss-dialogue-box {
+  position: relative;
+  width: min(100%, 720px);
+  background: #ffffff;
+  border-radius: 28px;
+  padding: 22px 28px 18px 28px;
+  box-shadow:
+    0 18px 44px rgba(0, 0, 0, 0.5),
+    0 4px 12px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
+  border: 2.5px solid rgba(255, 255, 255, 0.95);
+  box-sizing: border-box;
+}
+
+/* Speech bubble pointer notch */
+.boss-dialogue-box::before {
+  content: "";
+  position: absolute;
+  top: -12px;
+  left: 56px;
+  width: 20px;
+  height: 14px;
+  background: #ffffff;
+  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+  filter: drop-shadow(0 -2px 3px rgba(0, 0, 0, 0.08));
+}
+
+.boss-dialogue-speaker-badge {
+  position: absolute;
+  top: -15px;
+  left: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 14px;
+  border-radius: 9999px;
+  background: var(--boss-accent, #23ced9);
+  color: #06262c;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.28);
+  border: 2px solid #ffffff;
+  z-index: 3;
+}
+
+.boss-dialogue-speaker-name {
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.boss-dialogue-speaker-title {
+  font-size: 11px;
+  font-weight: 750;
+  opacity: 0.85;
+  border-left: 1px solid rgba(6, 38, 44, 0.28);
+  padding-left: 8px;
+}
+
+.boss-dialogue-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.boss-dialogue-line {
+  margin: 0;
+  color: #0f172a;
+  font-size: clamp(16px, 2.2vw, 20px);
+  font-weight: 700;
+  line-height: 1.45;
+  letter-spacing: -0.01em;
+}
+
+.boss-dialogue-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 10px 22px;
+  border: 1px solid #765a20;
+  border-radius: 9999px;
+  background: linear-gradient(180deg, #fce59f 0%, #f9d779 100%);
+  color: #103d41;
+  box-shadow:
+    0 4px 0 #805c1b,
+    0 6px 16px rgba(0, 0, 0, 0.25);
+  font-size: 15px;
+  font-weight: 850;
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.boss-dialogue-btn:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 5px 0 #805c1b,
+    0 8px 20px rgba(0, 0, 0, 0.3);
+}
+
+.boss-dialogue-btn:active {
+  transform: translateY(3px);
+  box-shadow:
+    0 1px 0 #805c1b,
+    0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.boss-dialogue-btn:focus-visible {
+  outline: 3px solid #07545b;
+  outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  .boss-dialogue-content {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 12px;
+  }
+  .boss-dialogue-line {
+    width: 100%;
+  }
+  .boss-dialogue-box {
+    border-radius: 22px;
+    padding: 18px 18px 14px 18px;
+  }
+}
+
+@media (max-height: 480px) {
+  .boss-dialogue-art {
+    padding-bottom: 2px;
+  }
+  .boss-playfield .boss-dialogue-art .boss-dialogue-canvas {
+    height: min(46vh, 170px);
+  }
+  .boss-dialogue-bubble-wrap {
+    padding: 0 12px 10px 12px;
+  }
+  .boss-dialogue-box {
+    border-radius: 18px;
+    padding: 12px 18px 10px 18px;
+  }
+  .boss-dialogue-box::before {
+    top: -10px;
+    width: 16px;
+    height: 11px;
+  }
+  .boss-dialogue-speaker-badge {
+    top: -12px;
+    padding: 3px 10px;
+  }
+  .boss-dialogue-speaker-name {
+    font-size: 11px;
+  }
+  .boss-dialogue-speaker-title {
+    font-size: 9px;
+    padding-left: 6px;
+  }
+  .boss-dialogue-line {
+    font-size: 14px;
+    line-height: 1.35;
+  }
+  .boss-dialogue-btn {
+    min-height: 36px;
+    padding: 6px 14px;
+    font-size: 13px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .boss-dialogue,
+  .boss-playfield .boss-dialogue-art .boss-dialogue-canvas,
+  .boss-dialogue-btn {
+    animation: none;
+    transition: none;
+  }
+}
 .boss-aim { position: relative; display: grid; width: clamp(58px, 12vh, 80px); aspect-ratio: 1; place-items: center; touch-action: none; pointer-events: auto; border: 2px solid #f9d779; border-radius: 50%; background: #07545bd9; color: #fff; }
 .boss-aim > span { width: 42%; aspect-ratio: 1; border: 2px solid #07545b; border-radius: 50%; background: #23ced9; }
 .boss-aim small { position: absolute; bottom: 4px; font-size: 9px; font-weight: 800; }
@@ -932,4 +1571,4 @@
 .boss-dash { background: #097c87; border-color: #a1cca6; box-shadow: 0 3px 0 #07545b; }
 .boss-attack { background: #f9d779; border-color: #765a20; color: #103d41; box-shadow: 0 4px 0 #a17a2d; }
 .raid-connection { position: absolute; top: 8px; left: 8px; z-index: 30; padding: 8px; border-radius: 8px; background: #fca47c; color: #422819; font-size: 12px; }
-@media (max-height: 480px) { .boss-intro-card { max-height: 100%; gap: 8px; padding: 12px; } .boss-intro h1 { font-size: 20px; } .boss-intro p { font-size: 12px; line-height: 1.35; } .boss-dialogue-box { padding: 8px 14px; } .boss-dialogue-box p { font-size: 14px; } .boss-actions-cluster { gap: 7px; } }
+@media (max-height: 480px) { .boss-actions-cluster { gap: 7px; } }

@@ -24,7 +24,7 @@ export function PlayerAvatar({ avatarId, accent, size, animated = false }: { ava
   return <span className={`player-avatar avatar-${selected} accent-${color}${animated ? " avatar-animated" : ""}`} style={size ? { width: size, height: size } : undefined} aria-hidden="true">
     <svg className="avatar-sprite" viewBox={portrait} focusable="false">
       <defs><clipPath id={clipId}><rect x={x} y={y} width={width} height={height} /></clipPath></defs>
-      <image href="/images/Pixel-Art%20Base%20Avatar%20Selection%20Sheet.png" width="1448" height="1086" clipPath={`url(#${clipId})`} />
+      <image href="/images/Pixel-Art%20Base%20Avatar%20Selection%20Sheet.webp" width="1448" height="1086" clipPath={`url(#${clipId})`} />
     </svg>
   </span>;
 }

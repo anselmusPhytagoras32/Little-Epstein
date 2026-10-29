@@ -4,25 +4,29 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Archive,
+  Camera,
   Check,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ChevronUp,
   CircleHelp,
   Clock3,
   Compass,
   Diamond,
+  Download,
   Flag,
   Flame,
+  Gift,
   Lock,
   LocateFixed,
   MailOpen,
+  Maximize2,
   RefreshCw,
   Sparkles,
   Trophy,
   Swords,
-  UserRound,
   Users,
-  Wand2,
   X,
   Zap,
 } from "lucide-react";
@@ -30,6 +34,26 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { landmarkForDay, ROUTE_HEIGHT, routePoint } from "../lib/escape-route";
 import { useGame } from "./game-provider";
 import { PlayerAvatar } from "./avatar";
+import { contraAudio } from "../lib/contra-audio";
+
+const REWARD_PHOTOS = [
+  {
+    id: "harbor-boat",
+    title: "The Escape Sailboat",
+    caption: "Docked at the northern harbor pier — your vessel away from the island.",
+    src: "/images/escape-island.webp",
+    alt: "The escape sailboat docked at the tropical harbor pier",
+    tag: "Day 30 Milestone",
+  },
+  {
+    id: "island-aerial",
+    title: "Island Horizon",
+    caption: "The entire 30-day journey behind you: beaches, dense jungle, and open sea.",
+    src: "/images/island-board-v2.webp",
+    alt: "Aerial survey map of the island escape route",
+    tag: "Journey Complete",
+  },
+];
 
 export default function EscapeScreen() {
   const game = useGame();
@@ -44,6 +68,46 @@ export default function EscapeScreen() {
   const [questsOpen, setQuestsOpen] = useState(true);
   const [rewardSelected, setRewardSelected] = useState(false);
   const [rewardOpen, setRewardOpen] = useState(false);
+  const [chestAnimStage, setChestAnimStage] = useState<"idle" | "shaking" | "opening" | "opened">("idle");
+  const [activePhotoIdx, setActivePhotoIdx] = useState(0);
+  const [lightboxPhoto, setLightboxPhoto] = useState<string | null>(null);
+  // Active player name from game context (online username or practice name)
+  const currentAppUsername =
+    game.username && game.username !== "You"
+      ? game.username
+      : game.me?.name && game.me.name !== "You"
+      ? game.me.name
+      : "";
+
+  const [playerName, setPlayerName] = useState(() => {
+    if (currentAppUsername) return currentAppUsername;
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("escape-certificate-custom-name");
+      if (saved && saved.trim() && saved !== "Survivor") return saved;
+    }
+    return "Survivor";
+  });
+
+  // Automatically update when user's name changes in settings or room
+  const prevUsernameRef = useRef(currentAppUsername);
+  useEffect(() => {
+    if (currentAppUsername && currentAppUsername !== prevUsernameRef.current) {
+      prevUsernameRef.current = currentAppUsername;
+      setPlayerName(currentAppUsername);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("escape-certificate-custom-name", currentAppUsername);
+      }
+    } else if (currentAppUsername && (!playerName || playerName === "Survivor")) {
+      setPlayerName(currentAppUsername);
+    }
+  }, [currentAppUsername, playerName]);
+
+  function handleNameChange(newName: string) {
+    setPlayerName(newName);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("escape-certificate-custom-name", newName);
+    }
+  }
 
   const completed = Math.min(30, game.checkInCount);
   const nextDay = Math.min(30, Math.max(1, completed + (game.checked ? 0 : 1)));
@@ -80,6 +144,267 @@ export default function EscapeScreen() {
   });
 
   const escapePercent = Math.min(100, Math.round((completed / 30) * 100));
+
+  function handleOpenChest() {
+    setRewardOpen(true);
+    setChestAnimStage("shaking");
+    try {
+      contraAudio.playRevive();
+    } catch {}
+
+    const timer1 = setTimeout(() => {
+      setChestAnimStage("opening");
+      try {
+        contraAudio.playVictory();
+      } catch {}
+    }, 450);
+
+    const timer2 = setTimeout(() => {
+      setChestAnimStage("opened");
+    }, 1100);
+
+    return () => {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+    };
+  }
+
+  function handleReplayChest() {
+    setChestAnimStage("idle");
+    setTimeout(() => {
+      handleOpenChest();
+    }, 120);
+  }
+
+  function downloadCertificate() {
+    if (typeof window === "undefined") return;
+    const certCanvas = document.createElement("canvas");
+    const ctx = certCanvas.getContext("2d");
+    if (!ctx) return;
+
+    // Standard Landscape Certificate Dimensions (11" x 8.5" at 200 DPI: 2200 x 1700 px)
+    certCanvas.width = 2200;
+    certCanvas.height = 1700;
+
+    // Background: ivory parchment with radial warmth
+    const bgGrad = ctx.createRadialGradient(1100, 850, 150, 1100, 850, 1300);
+    bgGrad.addColorStop(0, "#fffefb");
+    bgGrad.addColorStop(0.65, "#fbf5e7");
+    bgGrad.addColorStop(1, "#eee0c4");
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, 2200, 1700);
+
+    // Deep forest green primary border
+    ctx.strokeStyle = "#086870";
+    ctx.lineWidth = 18;
+    ctx.strokeRect(50, 50, 2100, 1600);
+
+    // Gold inner border
+    ctx.strokeStyle = "#d97706";
+    ctx.lineWidth = 5;
+    ctx.strokeRect(80, 80, 2040, 1540);
+
+    // Secondary thin gold outline
+    ctx.strokeStyle = "#facc15";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(95, 95, 2010, 1510);
+
+    // Corner decorative accents
+    const drawCorner = (x: number, y: number, angle: number) => {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(angle);
+      ctx.strokeStyle = "#b45309";
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(60, 0);
+      ctx.arc(60, 60, 60, -Math.PI / 2, 0);
+      ctx.lineTo(60, 60);
+      ctx.stroke();
+      ctx.fillStyle = "#ca8a04";
+      ctx.beginPath();
+      ctx.arc(30, 30, 8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    };
+
+    drawCorner(110, 110, 0);
+    drawCorner(2090, 110, Math.PI / 2);
+    drawCorner(2090, 1590, Math.PI);
+    drawCorner(110, 1590, -Math.PI / 2);
+
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+
+    // Top Medal Medallion
+    ctx.fillStyle = "#facc15";
+    ctx.beginPath();
+    ctx.arc(1100, 260, 56, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#92400e";
+    ctx.lineWidth = 4;
+    ctx.stroke();
+
+    ctx.strokeStyle = "#d97706";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(1100, 260, 48, 0, Math.PI * 2);
+    ctx.stroke();
+
+    const drawMedalStar = (cx: number, cy: number, spikes: number, outerR: number, innerR: number) => {
+      let rot = (Math.PI / 2) * 3;
+      let x = cx;
+      let y = cy;
+      const step = Math.PI / spikes;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - outerR);
+      for (let i = 0; i < spikes; i++) {
+        x = cx + Math.cos(rot) * outerR;
+        y = cy + Math.sin(rot) * outerR;
+        ctx.lineTo(x, y);
+        rot += step;
+        x = cx + Math.cos(rot) * innerR;
+        y = cy + Math.sin(rot) * innerR;
+        ctx.lineTo(x, y);
+        rot += step;
+      }
+      ctx.lineTo(cx, cy - outerR);
+      ctx.closePath();
+      ctx.fillStyle = "#78350f";
+      ctx.fill();
+    };
+    drawMedalStar(1100, 260, 5, 26, 12);
+
+    // Header Title: CERTIFICATE OF SURVIVAL
+    ctx.font = 'bold 64px "Times New Roman", Georgia, serif';
+    ctx.fillStyle = "#103d41";
+    ctx.fillText("CERTIFICATE OF SURVIVAL", 1100, 395);
+
+    // Subtitle
+    ctx.font = '800 30px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    ctx.fillStyle = "#b45309";
+    ctx.fillText("NO NUT NOVEMBER 2026 · ISLAND ESCAPE", 1100, 465);
+
+    // Divider line
+    ctx.strokeStyle = "#ca8a04";
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(650, 515);
+    ctx.lineTo(1550, 515);
+    ctx.stroke();
+
+    ctx.fillStyle = "#ca8a04";
+    ctx.beginPath();
+    ctx.arc(1100, 515, 6, 0, Math.PI * 2);
+    ctx.fill();
+
+    // "This officially certifies that"
+    ctx.font = 'italic 30px "Times New Roman", Georgia, serif';
+    ctx.fillStyle = "#475569";
+    ctx.fillText("This officially certifies that", 1100, 605);
+
+    // Recipient Name
+    const nameToDraw = (playerName || "SURVIVOR").toUpperCase();
+    ctx.font = 'bold 76px "Times New Roman", Georgia, serif';
+    ctx.fillStyle = "#0f172a";
+    ctx.fillText(nameToDraw, 1100, 715);
+
+    // Name underline
+    const measured = Math.max(500, ctx.measureText(nameToDraw).width + 100);
+    ctx.strokeStyle = "#d97706";
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(1100 - measured / 2, 775);
+    ctx.lineTo(1100 + measured / 2, 775);
+    ctx.stroke();
+
+    // Citation
+    ctx.font = '28px "Times New Roman", Georgia, serif';
+    ctx.fillStyle = "#1e293b";
+    ctx.fillText(
+      "has demonstrated extraordinary willpower, ironclad discipline, and honesty",
+      1100,
+      885
+    );
+    ctx.fillText(
+      "by conquering thirty consecutive days of the November challenge and escaping the island undefeated.",
+      1100,
+      940
+    );
+
+    // Stats row
+    ctx.font = '800 24px -apple-system, sans-serif';
+    ctx.fillStyle = "#086870";
+    ctx.fillText(
+      `30 DAYS LOGGED  ·  BEST STREAK: ${Math.max(30, game.bestStreak)} DAYS  ·  NOVEMBER 30, 2026`,
+      1100,
+      1065
+    );
+
+    // Gold Wax Seal (Bottom Center)
+    ctx.save();
+    ctx.translate(1100, 1260);
+    ctx.fillStyle = "#facc15";
+    ctx.beginPath();
+    ctx.arc(0, 0, 75, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#92400e";
+    ctx.lineWidth = 5;
+    ctx.stroke();
+
+    ctx.fillStyle = "#92400e";
+    for (let i = 0; i < 20; i++) {
+      const a = (i / 20) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.arc(Math.cos(a) * 65, Math.sin(a) * 65, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.font = "bold 15px -apple-system, sans-serif";
+    ctx.fillStyle = "#78350f";
+    ctx.fillText("VERIFIED", 0, -22);
+    ctx.font = "800 22px -apple-system, sans-serif";
+    ctx.fillText("NNN 2026", 0, 6);
+    ctx.font = "bold 13px -apple-system, sans-serif";
+    ctx.fillText("SURVIVOR", 0, 30);
+    ctx.restore();
+
+    // Date (Left)
+    ctx.font = '20px "Times New Roman", Georgia, serif';
+    ctx.fillStyle = "#475569";
+    ctx.fillText("Date of Escape", 480, 1420);
+    ctx.font = 'bold 24px "Times New Roman", Georgia, serif';
+    ctx.fillStyle = "#0f172a";
+    ctx.fillText("November 30, 2026", 480, 1375);
+    ctx.strokeStyle = "#94a3b8";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(320, 1400);
+    ctx.lineTo(640, 1400);
+    ctx.stroke();
+
+    // Signatures (Right)
+    ctx.font = '20px "Times New Roman", Georgia, serif';
+    ctx.fillStyle = "#475569";
+    ctx.fillText("Escape Harbor Authority", 1720, 1420);
+    ctx.font = 'italic bold 28px "Times New Roman", Georgia, serif';
+    ctx.fillStyle = "#086870";
+    ctx.fillText("The Island Crew", 1720, 1375);
+    ctx.strokeStyle = "#94a3b8";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(1560, 1400);
+    ctx.lineTo(1880, 1400);
+    ctx.stroke();
+
+    // Trigger PNG download
+    const safeName = (playerName || "Survivor").trim().replace(/[^a-zA-Z0-9_-]/g, "_");
+    const link = document.createElement("a");
+    link.download = `No-Nut-November-Survival-Certificate-${safeName}.png`;
+    link.href = certCanvas.toDataURL("image/png");
+    link.click();
+  }
 
   function scrollToDay(day: number, smooth = true) {
     if (!stage.current || !canvas.current) return;
@@ -141,27 +466,8 @@ export default function EscapeScreen() {
     : "Today's Escape Point";
 
   return (
-    <section className={`escape-screen${celebrating ? " celebrating" : ""}`} aria-labelledby="escape-title">
+    <section className={`escape-screen${celebrating ? " celebrating" : ""}`} aria-label="Island escape map">
       <div className="game-hud-header">
-        <div className="hud-title-banner">
-          <h1 id="escape-title" className="hud-main-title">The Escape</h1>
-          <span className="hud-subtitle">{game.mode === "online" ? game.room.name : "Solo practice"}</span>
-        </div>
-        <div className="hud-resources">
-          <button
-            className="hud-avatar-btn"
-            onClick={() => router.push("/settings#avatar")}
-            aria-label="Customize your swimmer"
-            title="Choose your swimmer"
-          >
-            <PlayerAvatar size={34} animated={false} />
-            <span className="hud-edit-dot"><Wand2 size={9} /></span>
-          </button>
-
-          <Link href="/account" className="hud-account-btn" aria-label="Account profile" title="Account profile">
-            <UserRound size={16} />
-          </Link>
-        </div>
         <button className="hud-route-progress" onClick={locate} aria-label={`Escape progress: ${completed} of 30 days. Find your checkpoint`}>
           <span className="hud-progress-label">Escape progress <strong>{completed} <span>/ 30 days</span></strong></span>
           <span className="hud-progress-track" aria-hidden="true"><span className="hud-progress-fill" style={{ transform: `scaleX(${escapePercent / 100})` }} /></span>
@@ -455,13 +761,14 @@ export default function EscapeScreen() {
 
             {/* HARBOR ESCAPE CHEST (Day 30 Treasure) */}
             <button
-              className={`treasure-chest-3d ${rewardUnlocked ? "is-unlocked" : "is-locked"}`}
+              className={`treasure-chest treasure-chest-3d ${rewardUnlocked ? "is-unlocked" : "is-locked"}`}
               style={{ left: "42%", top: `${(160 / ROUTE_HEIGHT) * 100}%` }}
               aria-label={rewardUnlocked ? "Open escape reward letter" : "Reward chest, unlock at day 30"}
               onClick={() => {
                 setSelectedPlayerId(null);
                 setRewardSelected(true);
                 setRewardOpen(false);
+                setChestAnimStage("idle");
                 setDetailsOpen(true);
               }}
             >
@@ -580,45 +887,270 @@ export default function EscapeScreen() {
           </div>
         </div>
       ) : rewardSelected ? (
-        /* DAY 30 REWARD DRAWER */
+        /* DAY 30 REWARD CHEST OPENING EXPERIENCE */
         <div className="checkpoint-detail-card reward-detail" aria-live="polite">
-          <button className="hide-detail-btn" onClick={() => setDetailsOpen(false)} aria-label="Close details">
-            <X size={18} />
-          </button>
-          <div className="detail-header-row">
-            <span className="detail-avatar-box reward-box">
-              <Archive size={26} />
-            </span>
-            <div>
-              <span className="step-tag-pill">DAY 30 ESCAPE HARBOR</span>
-              <h2>{rewardOpen ? "Your Escape Letter" : "The Escape Boat Chest"}</h2>
-            </div>
-          </div>
-          {rewardOpen && rewardUnlocked ? (
-            <div className="reward-letter-box">
-              <p><b>To the escapee who made it:</b></p>
-              <p>
-                Thirty consecutive days. You outpaced the chaser, showed up with honesty, and reached the boat on the
-                horizon. The island is behind you.
-              </p>
-              <p>With admiration from the entire crew.</p>
-
-              <p>Your run: {completed} days logged · Best streak: {game.bestStreak} days.</p>
-              <Link className="text-link" href="/streak">View your streak and milestones</Link>
-            </div>
-          ) : (
-            <p className="detail-body-text">
-              {rewardUnlocked
-                ? "You reached the end of the escape route! Open your letter inside."
-                : "Check in for 30 consecutive days to escape the island and unlock the harbor reward."}
-            </p>
-          )}
-          {rewardUnlocked && !rewardOpen && (
-            <button className="primary-button game-btn-3d" onClick={() => setRewardOpen(true)}>
-              <MailOpen size={18} /> Open Your Letter
+          <div className="reward-stage-header">
+            <h2>{rewardOpen ? "Your Escape Letter & Photos" : "The Escape Boat Chest"}</h2>
+            <button
+              type="button"
+              className="hide-detail-btn hide-map-detail"
+              onClick={() => setDetailsOpen(false)}
+              aria-label="Close details"
+            >
+              <X size={20} />
             </button>
+          </div>
+
+          <div className="chest-opening-arena">
+            {/* Volumetric god rays when opening / opened */}
+            {(chestAnimStage === "opening" || chestAnimStage === "opened") && (
+              <div className="chest-god-rays-emitter" aria-hidden="true">
+                <div className="chest-god-rays" />
+                <div className="chest-god-glow" />
+              </div>
+            )}
+
+            {/* 3D Chest Model Scene */}
+            <div className="chest-scene-viewport">
+              <div
+                className={`interactive-3d-chest ${rewardUnlocked ? "is-unlocked" : "is-locked"} is-${chestAnimStage}`}
+                onClick={rewardUnlocked && chestAnimStage === "idle" ? handleOpenChest : undefined}
+                role={rewardUnlocked && chestAnimStage === "idle" ? "button" : undefined}
+                tabIndex={rewardUnlocked && chestAnimStage === "idle" ? 0 : undefined}
+                aria-label={rewardUnlocked ? "Interactive treasure chest - click to open" : "Locked treasure chest"}
+                onKeyDown={(e) => {
+                  if ((e.key === "Enter" || e.key === " ") && rewardUnlocked && chestAnimStage === "idle") {
+                    handleOpenChest();
+                  }
+                }}
+              >
+                {/* 3D Hinged Lid Assembly */}
+                <div className="chest-lid-assembly">
+                  <div className="chest-lid-top">
+                    <div className="chest-lid-slats" />
+                    <div className="chest-lid-band band-left" />
+                    <div className="chest-lid-band band-center" />
+                    <div className="chest-lid-band band-right" />
+                  </div>
+                  <div className="chest-lid-rim">
+                    <div className="chest-lid-latch">
+                      <div className="chest-latch-ring" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Chest Interior Glow & Cavity */}
+                <div className="chest-interior-cavity">
+                  <div className="chest-gold-pile" />
+                  <div className="chest-interior-beam" />
+                </div>
+
+                {/* Chest Body Base */}
+                <div className="chest-body-box">
+                  <div className="chest-wood-grain" />
+                  <div className="chest-corner-bracket bracket-tl" />
+                  <div className="chest-corner-bracket bracket-tr" />
+                  <div className="chest-corner-bracket bracket-bl" />
+                  <div className="chest-corner-bracket bracket-br" />
+                  <div className="chest-body-band band-left" />
+                  <div className="chest-body-band band-right" />
+
+                  {/* Lock Plate */}
+                  <div className="chest-lock-plate">
+                    {rewardUnlocked ? (
+                      <span className="chest-lock-glow"><Sparkles size={14} aria-hidden="true" /></span>
+                    ) : (
+                      <Lock size={16} className="chest-lock-icon" />
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Pedestal / Shadow underneath */}
+              <div className="chest-pedestal-shadow" aria-hidden="true" />
+            </div>
+
+            {/* Sparkles / Ember particles */}
+            {rewardUnlocked && (
+              <div className="chest-ambient-particles" aria-hidden="true">
+                <span className="particle-sparkle p1">✦</span>
+                <span className="particle-sparkle p2">✦</span>
+                <span className="particle-sparkle p3">✦</span>
+                <span className="particle-sparkle p4">✦</span>
+              </div>
+            )}
+          </div>
+
+          {!rewardOpen && (
+            <div className="chest-status-callout">
+              <p className="detail-body-text">
+                {rewardUnlocked
+                  ? "You reached the end of the escape route! Open your letter and photos inside."
+                  : "Complete 30 days to escape the island and unlock the harbor reward."}
+              </p>
+
+              {rewardUnlocked && (
+                <button
+                  type="button"
+                  className="primary-button game-btn-3d reward-open"
+                  onClick={handleOpenChest}
+                >
+                  <MailOpen size={18} />
+                  <span>Open Chest & Reveal Keepsake</span>
+                  <Gift size={18} />
+                </button>
+              )}
+            </div>
           )}
-          <button className="secondary-button" onClick={() => setDetailsOpen(false)}>
+
+          {rewardOpen && rewardUnlocked && (
+            <div className={`chest-loot-reveal ${chestAnimStage === "opened" ? "is-ready" : "is-emerging"}`}>
+              {/* INSTAX PHOTO (Pure picture, zero details, authentic Instax paper) */}
+              <div className="instax-film-container">
+                <div
+                  className="instax-frame"
+                  onClick={() => setActivePhotoIdx((prev) => (prev < REWARD_PHOTOS.length - 1 ? prev + 1 : 0))}
+                  role="button"
+                  tabIndex={0}
+                  aria-label="Instax photo keepsake - tap to flip between photos"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      setActivePhotoIdx((prev) => (prev < REWARD_PHOTOS.length - 1 ? prev + 1 : 0));
+                    }
+                  }}
+                >
+                  <div className="instax-photo-surface">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={REWARD_PHOTOS[activePhotoIdx].src}
+                      alt={REWARD_PHOTOS[activePhotoIdx].alt}
+                      className="instax-image"
+                    />
+                    <button
+                      type="button"
+                      className="instax-zoom-pill"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setLightboxPhoto(REWARD_PHOTOS[activePhotoIdx].src);
+                      }}
+                      aria-label="View photo full size"
+                    >
+                      <Maximize2 size={12} aria-hidden="true" />
+                    </button>
+                  </div>
+
+                  {/* Instax classic bottom chin */}
+                  <div className="instax-chin">
+                    <span className="instax-chin-marker">Island Escape · Nov &apos;26</span>
+                    <div className="instax-photo-dots" role="tablist" aria-label="Instax photo selection">
+                      {REWARD_PHOTOS.map((_, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          role="tab"
+                          aria-selected={activePhotoIdx === idx}
+                          className={`instax-dot ${activePhotoIdx === idx ? "active" : ""}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActivePhotoIdx(idx);
+                          }}
+                          aria-label={`Photo ${idx + 1}`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* DOWNLOADABLE SURVIVAL CERTIFICATE */}
+              <div className="reward-letter-box reward-letter survivor-certificate-card">
+                <div className="certificate-ornate-border">
+                  <span className="cert-corner cert-corner-tl" aria-hidden="true" />
+                  <span className="cert-corner cert-corner-tr" aria-hidden="true" />
+                  <span className="cert-corner cert-corner-bl" aria-hidden="true" />
+                  <span className="cert-corner cert-corner-br" aria-hidden="true" />
+
+                  <div className="certificate-header">
+                    <Trophy size={28} className="certificate-medal-badge" aria-hidden="true" />
+                    <h3 className="certificate-heading">CERTIFICATE OF SURVIVAL</h3>
+                    <span className="certificate-subtitle">NO NUT NOVEMBER 2026 · ISLAND ESCAPE</span>
+                  </div>
+
+                  <div className="certificate-divider" aria-hidden="true" />
+
+                  <p className="certificate-present-line">This officially certifies that</p>
+
+                  <div className="certificate-name-row">
+                    <input
+                      type="text"
+                      className="certificate-name-input"
+                      value={playerName}
+                      onChange={(e) => handleNameChange(e.target.value)}
+                      aria-label="Name on certificate"
+                      placeholder="Your Name"
+                      maxLength={32}
+                    />
+                  </div>
+
+                  <p className="certificate-citation">
+                    has demonstrated extraordinary willpower, discipline, and honesty by conquering Thirty days of the November challenge and escaping the island undefeated.
+                  </p>
+
+                  {/* 3-Column Official Landscape Certificate Footer */}
+                  <div className="certificate-stats-footer">
+                    <div className="certificate-meta-item cert-col-left">
+                      <div className="cert-sig-line" aria-hidden="true" />
+                      <span className="cert-meta-label">DATE OF ESCAPE</span>
+                      <strong className="cert-meta-val">Nov 30, 2026</strong>
+                      <span className="cert-meta-sub">{completed} days logged</span>
+                    </div>
+
+                    <div className="certificate-gold-seal" aria-hidden="true">
+                      <span>★ 30 DAYS ★</span>
+                      <strong>SURVIVOR</strong>
+                      <small>NNN 2026</small>
+                    </div>
+
+                    <div className="certificate-meta-item cert-col-right">
+                      <div className="cert-sig-line" aria-hidden="true" />
+                      <span className="cert-meta-label">AUTHORITY</span>
+                      <strong className="cert-meta-val">The Island Crew</strong>
+                      <span className="cert-meta-sub">Best streak: {game.bestStreak} days</span>
+                    </div>
+                  </div>
+
+                  <div className="certificate-links-row">
+                    <Link className="cert-streak-link" href="/streak">
+                      View your streak and milestones →
+                    </Link>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  className="certificate-download-btn game-btn-3d"
+                  onClick={downloadCertificate}
+                >
+                  <Download size={18} />
+                  <span>Download Official Certificate (PNG)</span>
+                  <span className="cert-dim-badge">Standard Landscape · 11×8.5″</span>
+                </button>
+              </div>
+
+              {/* Action Toolbar */}
+              <div className="chest-reveal-actions">
+                <button
+                  type="button"
+                  className="chest-replay-btn game-btn-3d"
+                  onClick={handleReplayChest}
+                >
+                  <RefreshCw size={15} /> Replay Chest Opening
+                </button>
+              </div>
+            </div>
+          )}
+
+          <button className="secondary-button hide-map-detail" onClick={() => setDetailsOpen(false)}>
             Back to Island Map
           </button>
         </div>
@@ -762,6 +1294,28 @@ export default function EscapeScreen() {
         </div>
       )}
 
+      {lightboxPhoto && (
+        <div
+          className="reward-lightbox-backdrop"
+          onClick={() => setLightboxPhoto(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Enlarged keepsake photo"
+        >
+          <div className="reward-lightbox-card" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className="reward-lightbox-close"
+              onClick={() => setLightboxPhoto(null)}
+              aria-label="Close enlarged photo"
+            >
+              <X size={20} />
+            </button>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={lightboxPhoto} alt="Enlarged commemorative photo" className="reward-lightbox-img" />
+          </div>
+        </div>
+      )}
     </section>
   );
 }

@@ -123,7 +123,7 @@ try {
   await visibleClick(".map-self-avatar");
   await waitFor("location.pathname === '/settings' && document.querySelectorAll('input[name=avatar]').length === 8", "eight character choices");
   verify(await evaluate("document.querySelectorAll('input[name=avatarAccent]').length === 4"), "Four accent colors are available");
-  verify(await evaluate("(async()=>{const i=new Image();i.src='/images/Pixel-Art%20Base%20Avatar%20Selection%20Sheet.png';await i.decode();return i.naturalWidth===1448})()"), "The avatar artwork loads and decodes");
+  verify(await evaluate("(async()=>{const i=new Image();i.src='/images/Pixel-Art%20Base%20Avatar%20Selection%20Sheet.webp';await i.decode();return i.naturalWidth===1448})()"), "The avatar artwork loads and decodes");
   await visibleClick("label.avatar-option:has(input[value='diver'])");
   await waitFor("document.querySelector('input[name=avatar][value=diver]').checked && !document.querySelector('.avatar-options').disabled", "diver selection saved");
   await waitFor("JSON.parse(localStorage.getItem('escape-game-practice-v2')).avatarId === 'diver'", "diver persists in practice");
@@ -182,12 +182,14 @@ try {
     } else if (pathname === "/api/room/feed") payload = { events: [] };
     else if (pathname === "/api/session") payload = {
       user: { username: "Alex", avatarId: onlineAvatar, avatarAccent: onlineAccent, timezone: "UTC" },
-      room: { id: "11111111-1111-4111-8111-111111111111", name: "Test crew", timezone: "UTC", phase: "active", checkedInDays: ["2026-11-01", "2026-11-02", "2026-11-03"], players: [
-        { id: "self", username: "Alex", avatarId: onlineAvatar, avatarAccent: onlineAccent, status: "alive", checkedIn: true, streak: 3, progress: 3, self: true },
-        { id: "mara", username: "Mara", avatarId: "chef", avatarAccent: "sun", status: "alive", checkedIn: true, streak: 2, progress: 2, self: false },
-        { id: "kai", username: "Kai", avatarId: "diver", avatarAccent: "leaf", status: "eliminated", checkedIn: false, streak: 0, progress: 2, self: false },
-        { id: "finn", username: "Finn", avatarId: "scout", avatarAccent: "coral", status: "alive", checkedIn: true, streak: 5, progress: 5, self: false },
-      ] },
+      room: {
+        id: "11111111-1111-4111-8111-111111111111", name: "Test crew", timezone: "UTC", phase: "active", checkedInDays: ["2026-11-01", "2026-11-02", "2026-11-03"], players: [
+          { id: "self", username: "Alex", avatarId: onlineAvatar, avatarAccent: onlineAccent, status: "alive", checkedIn: true, streak: 3, progress: 3, self: true },
+          { id: "mara", username: "Mara", avatarId: "chef", avatarAccent: "sun", status: "alive", checkedIn: true, streak: 2, progress: 2, self: false },
+          { id: "kai", username: "Kai", avatarId: "diver", avatarAccent: "leaf", status: "eliminated", checkedIn: false, streak: 0, progress: 2, self: false },
+          { id: "finn", username: "Finn", avatarId: "scout", avatarAccent: "coral", status: "alive", checkedIn: true, streak: 5, progress: 5, self: false },
+        ]
+      },
     };
     if (!payload) return void page.send("Fetch.continueRequest", { requestId: event.requestId });
     void page.send("Fetch.fulfillRequest", { requestId: event.requestId, responseCode: 200, responseHeaders: [{ name: "Content-Type", value: "application/json" }], body: Buffer.from(JSON.stringify(payload)).toString("base64") });
@@ -221,7 +223,7 @@ try {
   if (exceptions.length) console.error(exceptions.join("\n"));
   process.exitCode = 1;
 } finally {
-  if (browser && context) await browser.send("Target.disposeBrowserContext", { browserContextId: context }).catch(() => {});
+  if (browser && context) await browser.send("Target.disposeBrowserContext", { browserContextId: context }).catch(() => { });
   page?.close();
   browser?.close();
 }

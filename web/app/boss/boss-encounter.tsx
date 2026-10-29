@@ -45,7 +45,7 @@ const opponents: Record<
 > = {
   kirkify: {
     name: "Kirkify",
-    image: "/images/Kirk%20Sprite%20Sheet.png",
+    image: "/images/Kirk%20Sprite%20Sheet.webp",
     accent: "#f9d779",
     title: "Coastal Enforcer",
     day: 10,
@@ -54,7 +54,7 @@ const opponents: Record<
   },
   diddy: {
     name: "Diddy",
-    image: "/images/Diddy%20Sprite%20Sheet.png",
+    image: "/images/Diddy%20Sprite%20Sheet.webp",
     accent: "#fca47c",
     title: "Island Horror Overseer",
     day: 20,
@@ -63,7 +63,7 @@ const opponents: Record<
   },
   epstein: {
     name: "Epstein",
-    image: "/images/Epstein%20Sprite%20Sheet.png",
+    image: "/images/Epstein%20Sprite%20Sheet.webp",
     accent: "#23ced9",
     title: "Island Overlord",
     day: 30,
@@ -136,8 +136,16 @@ type LaserTelegraph = {
   y: number;
   targetX: number;
   targetY: number;
+  endX: number;
+  endY: number;
   chargeTimer: number;
+  maxCharge: number;
+  lockDuration: number;
+  locked: boolean;
   fireTimer: number;
+  maxFire: number;
+  hasLockSound?: boolean;
+  hasFiredSound?: boolean;
 };
 
 type PhaseBanner = {
@@ -320,23 +328,89 @@ function cleanBossFrame(image: HTMLImageElement, frame: Frame): HTMLCanvasElemen
 
 function DialoguePortrait({ opponent }: { opponent: Opponent }) {
   const target = useRef<HTMLCanvasElement>(null);
+
   useEffect(() => {
-    const ctx = target.current?.getContext("2d");
+    const canvas = target.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
+
     let cancelled = false;
+    let animId = 0;
     const image = new Image();
-    image.onload = () => {
+
+    const startAnimation = () => {
       if (cancelled) return;
-      const cleaned = cleanBossFrame(image, SPRITE_MAPS[opponent].humanIdle[0]);
-      const scale = Math.min(110 / cleaned.width, 120 / cleaned.height);
-      ctx.imageSmoothingEnabled = false;
-      ctx.clearRect(0, 0, 120, 130);
-      ctx.drawImage(cleaned, (120 - cleaned.width * scale) / 2, 130 - cleaned.height * scale, cleaned.width * scale, cleaned.height * scale);
+      const idleFrames = SPRITE_MAPS[opponent].humanIdle;
+      const cw = canvas.width;
+      const ch = canvas.height;
+      let frameIdx = 0;
+      let lastTime = performance.now();
+      const frameDuration = 220;
+
+      const prefersReducedMotion =
+        typeof window !== "undefined" &&
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      const render = (now: number) => {
+        if (cancelled) return;
+
+        if (!prefersReducedMotion && now - lastTime >= frameDuration) {
+          frameIdx = (frameIdx + 1) % idleFrames.length;
+          lastTime = now;
+        }
+
+        const cleaned = cleanBossFrame(image, idleFrames[frameIdx]);
+        // Command presence: prominent ~330px character scaling on canvas
+        const targetHeight = 330;
+        const scale = Math.min((cw * 0.82) / cleaned.width, targetHeight / cleaned.height);
+        const dw = Math.round(cleaned.width * scale);
+        const dh = Math.round(cleaned.height * scale);
+        const dx = Math.round((cw - dw) / 2);
+        const dy = ch - dh - 24;
+
+        ctx.clearRect(0, 0, cw, ch);
+
+        // Ground stage shadow under boss feet
+        const groundY = ch - 20;
+        const shadowWidth = Math.max(68, dw * 0.46);
+        ctx.fillStyle = "rgba(4, 20, 24, 0.45)";
+        ctx.beginPath();
+        ctx.ellipse(cw / 2, groundY, shadowWidth, 8, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(cleaned, dx, dy, dw, dh);
+
+        if (!prefersReducedMotion) {
+          animId = requestAnimationFrame(render);
+        }
+      };
+
+      animId = requestAnimationFrame(render);
     };
+
+    image.onload = startAnimation;
     image.src = opponents[opponent].image;
-    return () => { cancelled = true; };
+    if (image.complete && image.naturalWidth > 0) {
+      startAnimation();
+    }
+
+    return () => {
+      cancelled = true;
+      if (animId) cancelAnimationFrame(animId);
+    };
   }, [opponent]);
-  return <canvas ref={target} width={120} height={130} aria-hidden="true" />;
+
+  return (
+    <canvas
+      ref={target}
+      width={360}
+      height={400}
+      className="boss-dialogue-canvas"
+      aria-hidden="true"
+    />
+  );
 }
 
 const SPRITE_MAPS: Record<Opponent, BossSpriteSheetMap> = {
@@ -600,8 +674,8 @@ export default function BossEncounter({
 
     Promise.all([
       loadImage(opponents[opponent].image),
-      loadImage("/images/Pixel-Art%20Base%20Avatar%20Selection%20Sheet.png"),
-      loadImage("/images/island-board-v2.png"),
+      loadImage("/images/Pixel-Art%20Base%20Avatar%20Selection%20Sheet.webp"),
+      loadImage("/images/island-board-v2.webp"),
     ])
       .then(([boss, avatar, island]) => {
         if (cancelled) return;
@@ -1022,13 +1096,24 @@ export default function BossEncounter({
       // Laser Beam Telegraph & Fire
       state.laserClock -= dt;
       if (state.laserClock <= 0 && !state.laser) {
+        const dx = state.x - state.bossX;
+        const dy = state.y - state.bossY;
+        const angle = Math.atan2(dy, dx);
         state.laser = {
           x: state.bossX,
           y: state.bossY,
           targetX: state.x,
           targetY: state.y,
-          chargeTimer: 1.4,
-          fireTimer: 0.55,
+          endX: state.bossX + Math.cos(angle) * 1400,
+          endY: state.bossY + Math.sin(angle) * 1400,
+          chargeTimer: 1.8,
+          maxCharge: 1.8,
+          lockDuration: 0.7, // Reticle locks onto player 0.7s before firing
+          locked: false,
+          fireTimer: 0.45,
+          maxFire: 0.45,
+          hasLockSound: false,
+          hasFiredSound: false,
         };
         state.laserClock = isEnraged ? 7.0 : 10.0;
       }
@@ -1038,14 +1123,48 @@ export default function BossEncounter({
           state.laser.chargeTimer -= dt;
           state.laser.x = state.bossX;
           state.laser.y = state.bossY;
-          state.laser.targetX = state.x;
-          state.laser.targetY = state.y;
+
+          if (state.laser.chargeTimer > state.laser.lockDuration) {
+            // Tracking phase: Reticle tracks player position
+            state.laser.targetX = state.x;
+            state.laser.targetY = state.y;
+            const dx = state.laser.targetX - state.laser.x;
+            const dy = state.laser.targetY - state.laser.y;
+            const angle = Math.atan2(dy, dx);
+            state.laser.endX = state.laser.x + Math.cos(angle) * 1400;
+            state.laser.endY = state.laser.y + Math.sin(angle) * 1400;
+          } else {
+            // Marked / Lock-on phase: TARGET POSITION IS FROZEN IN PLACE!
+            if (!state.laser.locked) {
+              state.laser.locked = true;
+              if (!state.laser.hasLockSound) {
+                state.laser.hasLockSound = true;
+                contraAudio.playLaserLock();
+              }
+            }
+            // Maintain frozen trajectory across arena
+            const dx = state.laser.targetX - state.laser.x;
+            const dy = state.laser.targetY - state.laser.y;
+            const angle = Math.atan2(dy, dx);
+            state.laser.endX = state.laser.x + Math.cos(angle) * 1400;
+            state.laser.endY = state.laser.y + Math.sin(angle) * 1400;
+          }
         } else if (state.laser.fireTimer > 0) {
+          if (!state.laser.hasFiredSound) {
+            state.laser.hasFiredSound = true;
+            contraAudio.playLaser();
+            state.screenShake = 0.35;
+            state.screenShakeIntensity = 7;
+          }
           state.laser.fireTimer -= dt;
-          // Check collision with beam
-          const dist = Math.hypot(state.laser.targetX - state.laser.x, state.laser.targetY - state.laser.y);
-          const nx = (state.laser.targetX - state.laser.x) / (dist || 1);
-          const ny = (state.laser.targetY - state.laser.y) / (dist || 1);
+
+          // Check collision with the locked beam path
+          const beamDx = state.laser.endX - state.laser.x;
+          const beamDy = state.laser.endY - state.laser.y;
+          const beamLen = Math.hypot(beamDx, beamDy) || 1;
+          const nx = beamDx / beamLen;
+          const ny = beamDy / beamLen;
+
           const px = state.x - state.laser.x;
           const py = state.y - state.laser.y;
           const dot = px * nx + py * ny;
@@ -1053,12 +1172,13 @@ export default function BossEncounter({
           const projY = state.laser.y + ny * dot;
           const perpDist = Math.hypot(state.x - projX, state.y - projY);
 
-          if (dot > 0 && dot < dist + 40 && perpDist < 26 && state.invulnerable <= 0) {
+          // Corridor thickness: radius 22px
+          if (dot > 0 && dot < beamLen && perpDist < 22 && state.invulnerable <= 0) {
             state.invulnerable = 0.9;
             state.hitsTaken += 1;
             contraAudio.playPlayerHit();
-            state.screenShake = 0.3;
-            state.screenShakeIntensity = 6;
+            state.screenShake = 0.35;
+            state.screenShakeIntensity = 8;
             state.hp = Math.max(0, state.hp - 22);
             state.floatingTexts.push({
               id: Math.random(),
@@ -1349,33 +1469,100 @@ export default function BossEncounter({
       // Laser Telegraph & Beam
       if (state.laser) {
         if (state.laser.chargeTimer > 0) {
-          ctx.strokeStyle = "rgba(244, 63, 94, 0.75)";
-          ctx.lineWidth = 2;
-          ctx.setLineDash([8, 6]);
-          ctx.beginPath();
-          ctx.moveTo(state.laser.x, state.laser.y);
-          ctx.lineTo(state.laser.targetX, state.laser.targetY);
-          ctx.stroke();
-          ctx.setLineDash([]);
+          const isLocked = state.laser.locked;
+          const pulse = Math.sin(state.animTimer * 24) * 0.5 + 0.5;
 
-          ctx.fillStyle = "rgba(244, 63, 94, 0.2)";
-          ctx.beginPath();
-          ctx.arc(state.laser.targetX, state.laser.targetY, 18, 0, Math.PI * 2);
-          ctx.fill();
+          if (!isLocked) {
+            // 1. Tracking phase: Soft tracking line from boss to player
+            ctx.strokeStyle = "rgba(244, 63, 94, 0.65)";
+            ctx.lineWidth = 1.8;
+            ctx.setLineDash([8, 6]);
+            ctx.beginPath();
+            ctx.moveTo(state.laser.x, state.laser.y);
+            ctx.lineTo(state.laser.endX, state.laser.endY);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Soft tracking target ring around player
+            ctx.strokeStyle = "rgba(244, 63, 94, 0.75)";
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.arc(state.laser.targetX, state.laser.targetY, 20, 0, Math.PI * 2);
+            ctx.stroke();
+          } else {
+            // 2. MARKED / LOCKED Phase: Target is locked on the ground!
+            // Glowing pre-ignition beam line along the locked trajectory
+            ctx.strokeStyle = `rgba(239, 68, 68, ${0.85 + pulse * 0.15})`;
+            ctx.lineWidth = 3 + pulse * 1.5;
+            ctx.beginPath();
+            ctx.moveTo(state.laser.x, state.laser.y);
+            ctx.lineTo(state.laser.endX, state.laser.endY);
+            ctx.stroke();
+
+            // Marked Ground Reticle on the locked coordinate
+            ctx.fillStyle = `rgba(239, 68, 68, ${0.25 + pulse * 0.15})`;
+            ctx.beginPath();
+            ctx.arc(state.laser.targetX, state.laser.targetY, 24, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.strokeStyle = "#f87171";
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.arc(state.laser.targetX, state.laser.targetY, 24, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // 4 Targeting Crosshair Ticks
+            const r = 24;
+            const tick = 7;
+            ctx.beginPath();
+            ctx.moveTo(state.laser.targetX, state.laser.targetY - r - tick);
+            ctx.lineTo(state.laser.targetX, state.laser.targetY - r + 3);
+            ctx.moveTo(state.laser.targetX, state.laser.targetY + r - 3);
+            ctx.lineTo(state.laser.targetX, state.laser.targetY + r + tick);
+            ctx.moveTo(state.laser.targetX - r - tick, state.laser.targetY);
+            ctx.lineTo(state.laser.targetX - r + 3, state.laser.targetY);
+            ctx.moveTo(state.laser.targetX + r - 3, state.laser.targetY);
+            ctx.lineTo(state.laser.targetX + r + tick, state.laser.targetY);
+            ctx.stroke();
+
+            // Visual "LOCKED" indicator above reticle
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "900 11px system-ui, sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "bottom";
+            ctx.fillText("! LOCKED !", state.laser.targetX, state.laser.targetY - 28);
+          }
         } else if (state.laser.fireTimer > 0) {
-          ctx.strokeStyle = "#fecdd3";
-          ctx.lineWidth = 14;
+          // 3. Firing Phase: Blasting beam down the entire locked trajectory
+          // Outer energy aura
+          ctx.strokeStyle = "rgba(244, 63, 94, 0.35)";
+          ctx.lineWidth = 30;
           ctx.beginPath();
           ctx.moveTo(state.laser.x, state.laser.y);
-          ctx.lineTo(state.laser.targetX, state.laser.targetY);
+          ctx.lineTo(state.laser.endX, state.laser.endY);
           ctx.stroke();
 
+          // Main laser beam
+          ctx.strokeStyle = "#f43f5e";
+          ctx.lineWidth = 16;
+          ctx.beginPath();
+          ctx.moveTo(state.laser.x, state.laser.y);
+          ctx.lineTo(state.laser.endX, state.laser.endY);
+          ctx.stroke();
+
+          // Blinding white plasma core
           ctx.strokeStyle = "#ffffff";
           ctx.lineWidth = 6;
           ctx.beginPath();
           ctx.moveTo(state.laser.x, state.laser.y);
-          ctx.lineTo(state.laser.targetX, state.laser.targetY);
+          ctx.lineTo(state.laser.endX, state.laser.endY);
           ctx.stroke();
+
+          // Impact blast at the marked position
+          ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+          ctx.beginPath();
+          ctx.arc(state.laser.targetX, state.laser.targetY, 28, 0, Math.PI * 2);
+          ctx.fill();
         }
       }
 
@@ -1750,7 +1937,7 @@ export default function BossEncounter({
           <div className="boss-health">
             <span>You</span>
             <div>
-              <i style={{ width: `${hud.hp}%` }} />
+              <i style={{ width: "100%", transform: `scaleX(${hud.hp / 100})` }} />
             </div>
             <b>{hud.hp}</b>
           </div>
@@ -1828,15 +2015,14 @@ export default function BossEncounter({
           />
 
           {phase !== "playing" && (
-            <div className="boss-intro">
+            <div
+              className="boss-intro"
+              style={{ "--boss-accent": currentOpponentConfig.accent } as React.CSSProperties}
+            >
               <div className="boss-intro-card">
-                <span className="boss-kicker">
-                  BOSS ENCOUNTER · SOLO PRACTICE OR CREW RAID
-                </span>
-
-                {/* Boss Switcher Tabs */}
+                {/* Boss Selector Tabs */}
                 {phase === "ready" && (
-                  <div className="boss-opponents-picker" role="tablist">
+                  <div className="boss-opponents-picker" role="tablist" aria-label="Boss stage selection">
                     {(["kirkify", "diddy", "epstein"] as Opponent[]).map((oppKey) => {
                       const cfg = opponents[oppKey];
                       const active = opponent === oppKey;
@@ -1845,94 +2031,183 @@ export default function BossEncounter({
                           key={oppKey}
                           type="button"
                           className={`boss-opponent-tab ${active ? "active" : ""}`}
-                          onClick={() => { if (oppKey !== opponent) { setLoaded(false); setLoadError(false); setOpponent(oppKey); } }}
+                          onClick={() => {
+                            if (oppKey !== opponent) {
+                              setLoaded(false);
+                              setLoadError(false);
+                              setOpponent(oppKey);
+                            }
+                          }}
                           disabled={!!lobby || lobbyBusy}
                           role="tab"
                           aria-selected={active}
                         >
-                          <Swords size={13} />
+                          <Swords size={14} aria-hidden="true" />
                           <span>{cfg.name}</span>
-                          <small>Day {cfg.day} · {cfg.targetMinutes}m</small>
+                          <small>Day {cfg.day}</small>
                         </button>
                       );
                     })}
                   </div>
                 )}
 
-                <h1>
-                  {phase === "won"
-                    ? `You defeated ${currentOpponentConfig.name}!`
-                    : phase === "lost"
-                    ? "The encounter ended"
-                    : `Face ${currentOpponentConfig.name}`}
-                </h1>
-
-                <p>
-                  {phase === "won"
-                    ? `You held on and defeated ${currentOpponentConfig.name}.`
-                    : phase === "lost"
-                    ? "The encounter ended. Try again when you’re ready."
-                    : "Dodge attacks, aim your shots and survive the encounter."}
-                </p>
-
-                {phase === "ready" && (
-                  <>
-                    <div className="boss-brief"><span><Timer size={16} /> {targetDurationMin}-minute encounter</span><span><Shield size={16} /> Endurance shield</span></div>
-                    <p className="boss-endurance-note">The shield prevents a knockout before {targetDurationMin} minutes. Boss health increases for each player in the lobby.</p>
-                    {lobby ? <section className="raid-lobby" aria-label="Crew lobby">
-                      <div className="raid-lobby-heading"><strong><Users size={17} /> Crew lobby</strong><span>{lobby.players.length} joined</span></div>
-                      <div className="raid-lobby-players">{lobby.players.map(player => <div className="raid-lobby-player" key={player.id}><PlayerAvatar avatarId={player.avatarId} accent={player.avatarAccent} size={34} /><span>{player.self ? "You" : player.name}</span></div>)}</div>
-                      <p>{lobby.host ? "Wait for your crew, then start when everyone is ready." : "Waiting for the host to start."}</p>
-                      <button className="raid-leave" onClick={() => void leaveLobby()} disabled={lobbyBusy}>Leave lobby</button>
-                    </section> : game.mode === "online" && game.room.id ? <button className="raid-join" onClick={() => void enterLobby()} disabled={lobbyBusy}><Users size={17} /> Join or create crew lobby</button> : <p className="boss-endurance-note">Solo practice is on this device. Sign in and join a crew room to play together.</p>}
-                    {lobbyError && <p className="boss-error" role="alert">{lobbyError}</p>}
-                  </>
-                )}
-
-                {results && (
-                  <div className="boss-results" aria-label="Encounter summary">
-                    <div>
-                      <strong>{results.durationStr}</strong>
-                      <span>Fight Duration</span>
+                <div className="boss-stage-body">
+                  {/* Left: Animated Boss Preview */}
+                  <div className="boss-preview-pane">
+                    <div className="boss-preview-canvas-wrap">
+                      <DialoguePortrait opponent={opponent} />
                     </div>
-                    <div>
-                      <strong>{results.squadCount}</strong>
-                      <span>Swimmers in squad</span>
-                    </div>
-                    <div>
-                      <strong>
-                        {results.shotsLanded}/{results.shotsFired}
-                      </strong>
-                      <span>Shots landed</span>
-                    </div>
-                    <div>
-                      <strong>{results.hitsTaken}</strong>
-                      <span>Hits taken</span>
+                    <div className="boss-preview-info">
+                      <span className="boss-preview-title" style={{ color: currentOpponentConfig.accent }}>
+                        {currentOpponentConfig.title}
+                      </span>
+                      <h2 className="boss-preview-name">{currentOpponentConfig.name}</h2>
                     </div>
                   </div>
-                )}
 
-                <p className="boss-small">Move, aim, hold attack and dash to dodge.</p>
+                  {/* Right: Mission Briefing & Action */}
+                  <div className="boss-mission-pane">
+                    <div className="boss-mission-heading">
+                      <h1>
+                        {phase === "won"
+                          ? `Victory! ${currentOpponentConfig.name} Defeated`
+                          : phase === "lost"
+                          ? "Encounter Ended"
+                          : `Face ${currentOpponentConfig.name}`}
+                      </h1>
+                      <p className="boss-mission-desc">
+                        {phase === "won"
+                          ? `You held your ground and survived the ${targetDurationMin}-minute raid.`
+                          : phase === "lost"
+                          ? "Knocked out by the island boss. Regroup and challenge again."
+                          : opponent === "kirkify"
+                          ? "Evade ricochet coconut clusters and outlast the coastal enforcer."
+                          : opponent === "diddy"
+                          ? "Dodge tracking laser beams and survive the island overseer."
+                          : "Endure eldritch tentacle barrages to secure your escape route."}
+                      </p>
+                    </div>
 
-                {loadError ? (
-                  <p className="boss-error">
-                    The sprite sheets could not load. Reconnect and reload this page.
-                  </p>
-                ) : lobby && phase !== "ready" ? (
-                  <button className="boss-start" onClick={() => void leaveLobby()} disabled={lobbyBusy}>Leave crew raid</button>
-                ) : (
-                  <button className="boss-start" onClick={() => void start()} disabled={!loaded || lobbyBusy || (!!lobby && !lobby.host)}>
-                    {!loaded
-                      ? "Loading sprites…"
-                      : phase === "ready"
-                      ? lobby ? lobby.host ? "Start crew raid" : "Waiting for host" : "Start solo practice"
-                      : "Try again"}
-                  </button>
-                )}
+                    {phase === "ready" && (
+                      <div className="boss-tactical-badges">
+                        <div className="boss-badge">
+                          <Timer size={14} aria-hidden="true" />
+                          <span>{targetDurationMin}m Target</span>
+                        </div>
+                        <div className="boss-badge">
+                          <Shield size={14} aria-hidden="true" />
+                          <span>Endurance Shield</span>
+                        </div>
+                        <div className="boss-badge">
+                          <Users size={14} aria-hidden="true" />
+                          <span>{lobby ? `${lobby.players.length} Swimmers` : "Solo Practice"}</span>
+                        </div>
+                      </div>
+                    )}
 
-                <Link href="/" className="boss-exit" onClick={() => { if (lobbyRef.current) void lobbyRequest(game.room.id, "leave").catch(() => {}); }}>
-                  Back to island
-                </Link>
+                    {results && (
+                      <div className="boss-results" aria-label="Encounter summary">
+                        <div className="boss-result-stat">
+                          <strong>{results.durationStr}</strong>
+                          <span>Duration</span>
+                        </div>
+                        <div className="boss-result-stat">
+                          <strong>{results.squadCount}</strong>
+                          <span>Swimmers</span>
+                        </div>
+                        <div className="boss-result-stat">
+                          <strong>
+                            {results.shotsLanded}/{results.shotsFired}
+                          </strong>
+                          <span>Accuracy</span>
+                        </div>
+                        <div className="boss-result-stat">
+                          <strong>{results.hitsTaken}</strong>
+                          <span>Hits Taken</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {lobby ? (
+                      <section className="raid-lobby" aria-label="Crew lobby">
+                        <div className="raid-lobby-heading">
+                          <strong><Users size={15} /> Crew Lobby</strong>
+                          <span>{lobby.players.length} joined</span>
+                        </div>
+                        <div className="raid-lobby-players">
+                          {lobby.players.map((player) => (
+                            <div className="raid-lobby-player" key={player.id}>
+                              <PlayerAvatar avatarId={player.avatarId} accent={player.avatarAccent} size={28} />
+                              <span>{player.self ? "You" : player.name}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <button type="button" className="raid-leave" onClick={() => void leaveLobby()} disabled={lobbyBusy}>
+                          Leave lobby
+                        </button>
+                      </section>
+                    ) : (
+                      game.mode === "online" &&
+                      game.room.id &&
+                      phase === "ready" && (
+                        <button type="button" className="raid-join" onClick={() => void enterLobby()} disabled={lobbyBusy}>
+                          <Users size={16} aria-hidden="true" />
+                          <span>Join Crew Lobby</span>
+                        </button>
+                      )
+                    )}
+
+                    {lobbyError && (
+                      <p className="boss-error" role="alert">
+                        {lobbyError}
+                      </p>
+                    )}
+
+                    {loadError ? (
+                      <p className="boss-error" role="alert">
+                        The sprite sheets could not load. Reconnect and reload this page.
+                      </p>
+                    ) : lobby && phase !== "ready" ? (
+                      <button type="button" className="boss-start" onClick={() => void leaveLobby()} disabled={lobbyBusy}>
+                        Leave Crew Raid
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="boss-start"
+                        onClick={() => void start()}
+                        disabled={!loaded || lobbyBusy || (!!lobby && !lobby.host)}
+                      >
+                        {!loaded ? (
+                          "Loading sprites…"
+                        ) : phase === "ready" ? (
+                          lobby ? (
+                            lobby.host ? "Start Crew Raid ⚔️" : "Waiting for Host…"
+                          ) : (
+                            <>Start Solo Practice <Swords size={18} aria-hidden="true" /></>
+                          )
+                        ) : (
+                          <>Fight Again <Swords size={18} aria-hidden="true" /></>
+                        )}
+                      </button>
+                    )}
+
+                    <div className="boss-card-footer">
+                      <p className="boss-controls-hint">
+                        <span>WASD</span> Move · <span>Space</span> Attack · <span>Shift</span> Dash
+                      </p>
+                      <Link
+                        href="/"
+                        className="boss-exit"
+                        onClick={() => {
+                          if (lobbyRef.current) void lobbyRequest(game.room.id, "leave").catch(() => {});
+                        }}
+                      >
+                        ← Back to Island
+                      </Link>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -2004,10 +2279,52 @@ export default function BossEncounter({
               </div>
             </div>
           )}
-          {phase === "playing" && dialogueOpen && <div className="boss-dialogue" role="dialog" aria-modal="true" aria-labelledby="boss-dialogue-name">
-            <div className="boss-dialogue-art"><DialoguePortrait opponent={opponent} /></div>
-            <div className="boss-dialogue-box"><strong id="boss-dialogue-name">{currentOpponentConfig.name.toUpperCase()}</strong><p>{opponent === "kirkify" ? "You think you can make it past me?" : opponent === "diddy" ? "The tide turns against you here." : "There is no easy way off this island."}</p><button onClick={() => setDialogueOpen(false)} autoFocus>Let&apos;s fight <Swords size={15} aria-hidden="true" /></button></div>
-          </div>}
+          {phase === "playing" && dialogueOpen && (
+            <div
+              className="boss-dialogue"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="boss-dialogue-name"
+              style={{ "--boss-accent": currentOpponentConfig.accent } as React.CSSProperties}
+            >
+              <div className="boss-dialogue-art">
+                <DialoguePortrait opponent={opponent} />
+              </div>
+
+              <div className="boss-dialogue-bubble-wrap">
+                <div className="boss-dialogue-box">
+                  <div className="boss-dialogue-speaker-badge">
+                    <span className="boss-dialogue-speaker-name" id="boss-dialogue-name">
+                      {currentOpponentConfig.name.toUpperCase()}
+                    </span>
+                    <span className="boss-dialogue-speaker-title">
+                      {currentOpponentConfig.title}
+                    </span>
+                  </div>
+
+                  <div className="boss-dialogue-content">
+                    <p className="boss-dialogue-line">
+                      {opponent === "kirkify"
+                        ? "You think you can make it past me? Let's see what you've got!"
+                        : opponent === "diddy"
+                        ? "The tide turns against you here. You won't leave alive."
+                        : "There is no easy way off this island."}
+                    </p>
+
+                    <button
+                      type="button"
+                      className="boss-dialogue-btn"
+                      onClick={() => setDialogueOpen(false)}
+                      autoFocus
+                    >
+                      <span>Let&apos;s fight</span>
+                      <Swords size={18} aria-hidden="true" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
           {phase === "playing" && lobbyError && <p className="raid-connection" role="status">{lobbyError}</p>}
         </div>
 

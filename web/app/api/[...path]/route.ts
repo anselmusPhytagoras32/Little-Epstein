@@ -61,6 +61,17 @@ async function authed(request: NextRequest): Promise<AuthedPlayer> {
   return result.rows[0];
 }
 
+async function optionalAuthed(request: NextRequest): Promise<AuthedPlayer | null> {
+  const token = request.cookies.get(COOKIE)?.value;
+  if (!token || token.length !== 64) return null;
+  try {
+    const result = await database().query<AuthedPlayer>(`SELECT p.id,p.email,p.username,p.avatar_id,p.avatar_accent,p.timezone,p.reminder_time::text AS reminder_time,p.reminders_enabled FROM sessions s JOIN players p ON p.id=s.player_id WHERE s.token_hash=$1 AND s.expires_at>now()`, [hash(token)]);
+    return result.rowCount ? result.rows[0] : null;
+  } catch {
+    return null;
+  }
+}
+
 async function insertRoom(client: DbClient, playerId: string, name: string, timezone: string) {
   const code = invite();
   const created = await client.query<{ id: string; name: string; timezone: string; phase: string }>(
@@ -220,7 +231,8 @@ export async function GET(request:NextRequest,{params}:{params:Promise<{path:str
   try {
     const {path}=await params;const action=path.join("/");
     if(action==="session"){
-      const user=await authed(request);
+      const user=await optionalAuthed(request);
+      if(!user) return json({user: null, room: null});
       const selectedRoomId=request.nextUrl.searchParams.get("room");
       if(selectedRoomId&&!idForm.test(selectedRoomId))return fail("Choose a valid room.");
       const room=await loadRoom(user.id,selectedRoomId);

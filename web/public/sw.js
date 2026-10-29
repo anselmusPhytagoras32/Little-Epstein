@@ -1,4 +1,4 @@
-const VERSION = "escape-pwa-v18";
+const VERSION = "escape-pwa-v19";
 const APP_CACHE = `${VERSION}-pages`;
 const ASSET_CACHE = `${VERSION}-assets`;
 const CORE_PAGES = [
@@ -8,13 +8,13 @@ const CORE_PAGES = [
 ];
 const PUBLIC_ASSETS = [
   "/offline.html",
-  "/images/escape-island.png",
-  "/images/island-board-v2.png",
-  "/images/mascot.png",
-  "/images/Kirk%20Sprite%20Sheet.png",
-  "/images/Diddy%20Sprite%20Sheet.png",
-  "/images/Epstein%20Sprite%20Sheet.png",
-  "/images/Pixel-Art%20Base%20Avatar%20Selection%20Sheet.png",
+  "/images/escape-island.webp",
+  "/images/island-board-v2.webp",
+  "/images/mascot.webp",
+  "/images/Kirk%20Sprite%20Sheet.webp",
+  "/images/Diddy%20Sprite%20Sheet.webp",
+  "/images/Epstein%20Sprite%20Sheet.webp",
+  "/images/Pixel-Art%20Base%20Avatar%20Selection%20Sheet.webp",
   "/icons/escape-app-192.png",
   "/icons/escape-app-512.png",
   "/icons/escape-app.svg",

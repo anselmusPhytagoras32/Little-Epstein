@@ -56,7 +56,8 @@
 .onboarding-progress>span {
   border-radius: inherit;
   height: 100%;
-  transition: width .25s var(--ease);
+  transform-origin: left;
+  transition: transform .25s var(--ease);
   background: #1d322a;
   display: block;
 }
@@ -775,40 +776,15 @@ ul,ol {
 }
 
 .game-hud-header {
-  padding: calc(10px + env(safe-area-inset-top)) 16px 10px;
+  padding: calc(8px + env(safe-area-inset-top)) 16px 8px;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-  background: #fffefa;
-  border-bottom: 1px solid #dce7dc;
-  grid-template-columns: minmax(0,1fr) auto;
-  gap: 8px 12px;
-  display: grid;
+  background: #bfe5cf;
+  border-bottom: 1px solid #80bca5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   box-shadow: 0 3px 12px #173b3314;
-}
-
-.hud-title-banner {
-  text-align: left;
-  align-items: flex-start;
-  min-width: 0;
-}
-
-.hud-main-title {
-  font-size: 17px;
-  font-weight: 800;
-}
-
-.hud-subtitle {
-  max-width: 100%;
-  font-size: 11px;
-}
-
-.hud-resources {
-  gap: 8px;
-}
-
-.hud-avatar-btn,.hud-account-btn {
-  width: 44px;
-  height: 44px;
 }
 
 .hud-route-progress {
@@ -817,13 +793,16 @@ ul,ol {
   background: #edf2e8;
   border: 0;
   border-radius: 10px;
-  grid-column: 1/-1;
+  width: 100%;
+  max-width: 620px;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
   min-width: 0;
-  min-height: 36px;
-  padding: 5px 10px;
+  min-height: 38px;
+  padding: 6px 12px;
   display: flex;
+  cursor: pointer;
 }
 
 .hud-progress-label {
@@ -1044,7 +1023,7 @@ ul,ol {
   overscroll-behavior-y: contain;
   scrollbar-width: thin;
   scrollbar-color: #facc15 #0e2e34;
-  background: #185a66 url(/images/island-board-v2.png) 50%/cover no-repeat;
+  background: #185a66 url(/images/island-board-v2.webp) 50%/cover no-repeat;
   width: 100%;
   height: 100%;
   position: relative;
@@ -1399,7 +1378,7 @@ ul,ol {
 
 .mascot-portrait {
   aspect-ratio: 1;
-  background-image: url(/images/mascot.png);
+  background-image: url(/images/mascot.webp);
   background-repeat: no-repeat;
   background-size: 300% 200%;
   border-radius: 13px;
@@ -1901,17 +1880,1060 @@ ul,ol {
   text-decoration: underline;
 }
 
-.reward-letter-box {
-  color: #713f12;
-  background: #fef9c3;
-  border: 1px solid #fde047;
-  border-radius: 14px;
-  gap: 10px;
-  margin: 12px 0;
-  padding: 14px;
-  font-size: 13px;
-  line-height: 1.5;
+/* ==========================================================================
+   INSTAX FILM PHOTO KEEPSAKE (Pure Picture, No UI Clutter)
+   ========================================================================== */
+
+.instax-film-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  padding: 6px 0;
+}
+
+.instax-frame {
+  position: relative;
+  background: #ffffff;
+  padding: 12px 12px 42px 12px;
+  border-radius: 8px;
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.2);
+  width: 100%;
+  max-width: 330px;
+  cursor: pointer;
+  transform: rotate(-1.5deg);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease;
+  user-select: none;
+}
+
+.instax-frame:hover {
+  transform: rotate(0deg) scale(1.02);
+  box-shadow: 0 22px 48px rgba(0, 0, 0, 0.65), 0 3px 10px rgba(0, 0, 0, 0.25);
+}
+
+.instax-photo-surface {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  background: #0f172a;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
+}
+
+.instax-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.instax-zoom-pill {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.7);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
   display: grid;
+  place-items: center;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.instax-zoom-pill:hover {
+  transform: scale(1.1);
+  background: rgba(15, 23, 42, 0.9);
+}
+
+/* Instax Bottom Chin */
+.instax-chin {
+  position: absolute;
+  bottom: 10px;
+  left: 14px;
+  right: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.instax-chin-marker {
+  font-family: "Caveat", "Comic Sans MS", "Segoe Print", cursive, sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: #334155;
+  letter-spacing: 0.02em;
+}
+
+.instax-photo-dots {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.instax-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: none;
+  background: #cbd5e1;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.instax-dot.active {
+  background: #854d0e;
+  transform: scale(1.25);
+}
+
+/* ==========================================================================
+   DOWNLOADABLE SURVIVAL CERTIFICATE (No Nut November 2026)
+   Standard Landscape Diploma Edition (US Letter 11" x 8.5" Proportions)
+   ========================================================================== */
+
+.reward-letter-box.reward-letter.survivor-certificate-card {
+  width: 100%;
+  max-width: 620px;
+  margin: 12px auto 0;
+  background: radial-gradient(ellipse at 50% 50%, #fffefb 0%, #faf3e4 65%, #eee0c4 100%);
+  color: #103d41;
+  border: 3px solid #086870;
+  border-radius: 14px;
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.55), inset 0 0 0 2px #d97706, inset 0 0 0 4px #fef08a;
+  padding: 12px 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: relative;
+  box-sizing: border-box;
+}
+
+.certificate-ornate-border {
+  border: 1.5px solid #d97706;
+  border-radius: 8px;
+  padding: clamp(10px, 2.2vw, 18px) clamp(12px, 3vw, 24px);
+  background: rgba(255, 255, 255, 0.68);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  justify-content: space-between;
+  position: relative;
+  box-shadow: inset 0 0 0 1px rgba(180, 83, 9, 0.25);
+  box-sizing: border-box;
+  gap: 6px;
+  /* Standard Landscape Certificate aspect ratio (1.33:1 ~ US Letter Landscape 11:8.5) */
+  aspect-ratio: 1.33 / 1;
+  min-height: 290px;
+}
+
+@media (max-width: 480px) {
+  .certificate-ornate-border {
+    aspect-ratio: auto;
+    min-height: 310px;
+    padding: 12px 10px;
+    gap: 6px;
+  }
+}
+
+/* Corner Accents: Ornate Brass Rivets */
+.cert-corner {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #d97706;
+  box-shadow: 0 0 0 1.5px #facc15;
+  pointer-events: none;
+}
+
+.cert-corner-tl {
+  top: 5px;
+  left: 5px;
+}
+
+.cert-corner-tr {
+  top: 5px;
+  right: 5px;
+}
+
+.cert-corner-bl {
+  bottom: 5px;
+  left: 5px;
+}
+
+.cert-corner-br {
+  bottom: 5px;
+  right: 5px;
+}
+
+.certificate-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.certificate-medal-badge {
+  font-size: clamp(20px, 3.6vw, 26px);
+  line-height: 1;
+  filter: drop-shadow(0 2px 4px rgba(180, 83, 9, 0.3));
+}
+
+.certificate-heading {
+  font-family: "Times New Roman", Georgia, serif;
+  font-size: clamp(15px, 3.2vw, 21px);
+  font-weight: 850;
+  color: #103d41;
+  letter-spacing: 0.05em;
+  margin: 0;
+}
+
+.certificate-subtitle {
+  font-size: clamp(8.5px, 1.8vw, 10.5px);
+  font-weight: 850;
+  color: #b45309;
+  letter-spacing: 0.12em;
+}
+
+.certificate-divider {
+  width: 75%;
+  height: 1.5px;
+  background: linear-gradient(90deg, transparent 0%, #ca8a04 50%, transparent 100%);
+  margin: 1px 0;
+}
+
+.certificate-present-line {
+  font-family: "Times New Roman", Georgia, serif;
+  font-style: italic;
+  font-size: clamp(11px, 2vw, 12.5px);
+  color: #475569;
+  margin: 0;
+}
+
+.certificate-name-row {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.certificate-name-input {
+  width: 90%;
+  max-width: 360px;
+  font-family: "Times New Roman", Georgia, serif;
+  font-size: clamp(18px, 4vw, 26px);
+  font-weight: 850;
+  color: #0f172a;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid #d97706;
+  border-radius: 0;
+  padding: 2px 6px;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.certificate-name-input:focus {
+  border-bottom-color: #086870;
+  background: rgba(254, 240, 138, 0.2);
+}
+
+.certificate-citation {
+  font-family: "Times New Roman", Georgia, serif;
+  font-size: clamp(10.5px, 2vw, 12.5px);
+  line-height: 1.4;
+  color: #1e293b;
+  margin: 0;
+  max-width: 480px;
+}
+
+/* 3-Column Landscape Diploma Footer */
+.certificate-stats-footer {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(180, 83, 9, 0.25);
+  margin-top: 2px;
+}
+
+.certificate-meta-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.cert-sig-line {
+  width: 80%;
+  max-width: 110px;
+  height: 1px;
+  background: #94a3b8;
+  margin-bottom: 2px;
+}
+
+.cert-meta-label {
+  font-size: clamp(7.5px, 1.6vw, 9px);
+  font-weight: 850;
+  color: #64748b;
+  letter-spacing: 0.06em;
+}
+
+.cert-meta-val {
+  font-size: clamp(10px, 2vw, 11.5px);
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.cert-meta-sub {
+  font-size: clamp(8.5px, 1.7vw, 10px);
+  font-weight: 800;
+  color: #086870;
+}
+
+.certificate-gold-seal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: clamp(48px, 9vw, 58px);
+  height: clamp(48px, 9vw, 58px);
+  border-radius: 50%;
+  background: #facc15;
+  border: 2px solid #92400e;
+  color: #78350f;
+  box-shadow: 0 2px 8px rgba(146, 64, 14, 0.35);
+  transform: rotate(-3deg);
+  flex-shrink: 0;
+}
+
+.certificate-gold-seal span {
+  font-size: clamp(6px, 1.3vw, 7px);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.certificate-gold-seal strong {
+  font-size: clamp(8.5px, 1.8vw, 10px);
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.certificate-gold-seal small {
+  font-size: clamp(6.5px, 1.3vw, 7.5px);
+  font-weight: 800;
+}
+
+.certificate-links-row {
+  margin-top: 1px;
+}
+
+.cert-streak-link {
+  font-size: 11px;
+  font-weight: 800;
+  color: #086870;
+  text-decoration: none;
+}
+
+.cert-streak-link:hover {
+  text-decoration: underline;
+}
+
+.certificate-download-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 18px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #facc15 0%, #ca8a04 100%);
+  color: #451a03;
+  font-size: 14px;
+  font-weight: 850;
+  border: 1px solid #fef08a;
+  box-shadow: 0 4px #854d0e, 0 8px 20px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.cert-dim-badge {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(69, 26, 3, 0.12);
+  color: #451a03;
+  letter-spacing: 0.02em;
+}
+
+.certificate-download-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 5px #854d0e, 0 10px 22px rgba(0, 0, 0, 0.4);
+}
+
+.certificate-download-btn:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px #854d0e;
+}
+
+.practice-preview-btn {
+  margin-top: 4px;
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* ==========================================================================
+   INTERACTIVE 3D ESCAPE CHEST OPENING EXPERIENCE
+   ========================================================================== */
+
+.checkpoint-detail-card.reward-detail {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  width: 100vw;
+  height: 100vh;
+  max-width: 100vw;
+  max-height: 100vh;
+  margin: 0;
+  border-radius: 0;
+  border: none;
+  background: radial-gradient(circle at 50% 26%, #0e3d47 0%, #08242a 50%, #030f12 100%);
+  color: #f0fdf4;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: calc(24px + env(safe-area-inset-top)) clamp(16px, 4vw, 32px) calc(44px + env(safe-area-inset-bottom));
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 16px;
+  animation: reward-stage-fade 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-sizing: border-box;
+}
+
+@keyframes reward-stage-fade {
+  from { opacity: 0; transform: scale(0.99); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.reward-stage-header {
+  width: 100%;
+  max-width: 640px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  padding: 0 4px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.checkpoint-detail-card.reward-detail h2 {
+  font-size: clamp(20px, 4.2vw, 26px);
+  font-weight: 850;
+  color: #fef08a;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.65);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.checkpoint-detail-card.reward-detail .hide-detail-btn {
+  position: static;
+  background: rgba(255, 255, 255, 0.1);
+  color: #f1f5f9;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.checkpoint-detail-card.reward-detail .hide-detail-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(1.05);
+}
+
+/* Chest Arena */
+.chest-opening-arena {
+  position: relative;
+  width: 100%;
+  min-height: 190px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 8px 0 14px;
+}
+
+.chest-scene-viewport {
+  position: relative;
+  perspective: 900px;
+  perspective-origin: 50% 35%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 0;
+}
+
+.chest-pedestal-shadow {
+  width: 220px;
+  height: 28px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(250, 204, 21, 0.3) 0%, rgba(0, 0, 0, 0.6) 50%, transparent 75%);
+  margin-top: -10px;
+  filter: blur(4px);
+}
+
+/* 3D Chest Container */
+.interactive-3d-chest {
+  position: relative;
+  width: 180px;
+  height: 125px;
+  transform-style: preserve-3d;
+  cursor: default;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.interactive-3d-chest.is-unlocked {
+  cursor: pointer;
+}
+
+.interactive-3d-chest.is-unlocked:hover {
+  transform: translateY(-2px) scale(1.02);
+}
+
+/* Shaking anticipation */
+.interactive-3d-chest.is-shaking {
+  animation: chest-anticipation-shake 0.45s ease-in-out infinite;
+}
+
+@keyframes chest-anticipation-shake {
+  0% { transform: translateY(0) rotate(0deg); }
+  20% { transform: translateY(-4px) rotate(-2.5deg); }
+  40% { transform: translateY(1px) rotate(2.5deg); }
+  60% { transform: translateY(-3px) rotate(-1.5deg); }
+  80% { transform: translateY(1px) rotate(1.5deg); }
+  100% { transform: translateY(0) rotate(0deg); }
+}
+
+/* The Hinged Lid */
+.chest-lid-assembly {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 56px;
+  transform-origin: top center;
+  transform-style: preserve-3d;
+  transition: transform 0.65s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 5;
+}
+
+.interactive-3d-chest.is-opening .chest-lid-assembly,
+.interactive-3d-chest.is-opened .chest-lid-assembly {
+  transform: rotateX(-125deg);
+}
+
+.chest-lid-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 48px;
+  border-radius: 20px 20px 2px 2px;
+  background: linear-gradient(180deg, #92400e 0%, #78350f 45%, #451a03 100%);
+  border: 2px solid #facc15;
+  box-shadow: inset 0 3px 6px rgba(254, 240, 138, 0.4), 0 4px 12px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+.chest-lid-slats {
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(90deg, transparent, transparent 38px, rgba(0, 0, 0, 0.3) 38px, rgba(0, 0, 0, 0.3) 40px);
+}
+
+.chest-lid-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 14px;
+  background: linear-gradient(180deg, #fef08a 0%, #eab308 50%, #a16207 100%);
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.4);
+}
+
+.chest-lid-band.band-left { left: 24px; }
+.chest-lid-band.band-center { left: calc(50% - 7px); }
+.chest-lid-band.band-right { right: 24px; }
+
+.chest-lid-rim {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 12px;
+  background: linear-gradient(180deg, #fef08a 0%, #ca8a04 100%);
+  border-radius: 0 0 2px 2px;
+  border-top: 1px solid rgba(0, 0, 0, 0.3);
+  display: flex;
+  justify-content: center;
+}
+
+.chest-lid-latch {
+  width: 28px;
+  height: 16px;
+  background: linear-gradient(180deg, #fef08a 0%, #a16207 100%);
+  border-radius: 0 0 8px 8px;
+  border: 1px solid #78350f;
+  margin-top: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+  display: grid;
+  place-items: center;
+}
+
+.chest-latch-ring {
+  width: 10px;
+  height: 6px;
+  border: 2px solid #451a03;
+  border-radius: 3px;
+}
+
+/* Interior Cavity */
+.chest-interior-cavity {
+  position: absolute;
+  top: 24px;
+  left: 8px;
+  right: 8px;
+  height: 40px;
+  background: #1c0a00;
+  border-radius: 4px;
+  z-index: 1;
+  overflow: hidden;
+  box-shadow: inset 0 6px 12px rgba(0, 0, 0, 0.95);
+}
+
+.chest-gold-pile {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 22px;
+  background: radial-gradient(ellipse at center, #fef08a 0%, #eab308 40%, #854d0e 80%);
+  border-radius: 50% 50% 0 0;
+  box-shadow: 0 0 16px #facc15;
+}
+
+.interactive-3d-chest.is-opening .chest-interior-beam,
+.interactive-3d-chest.is-opened .chest-interior-beam {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, #ffffff 0%, #fef08a 40%, transparent 80%);
+  filter: blur(6px);
+  animation: interior-beam-pulse 1.8s ease-in-out infinite alternate;
+}
+
+@keyframes interior-beam-pulse {
+  0% { opacity: 0.7; transform: scaleY(0.9); }
+  100% { opacity: 1; transform: scaleY(1.1); }
+}
+
+/* Chest Body Base */
+.chest-body-box {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 74px;
+  background: linear-gradient(180deg, #78350f 0%, #451a03 100%);
+  border: 2px solid #b45309;
+  border-radius: 2px 2px 14px 14px;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.6), 0 8px 24px rgba(0, 0, 0, 0.6);
+  z-index: 3;
+  overflow: hidden;
+}
+
+.chest-wood-grain {
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(90deg, transparent, transparent 38px, rgba(0, 0, 0, 0.35) 38px, rgba(0, 0, 0, 0.35) 40px);
+}
+
+.chest-corner-bracket {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  background: #fde047;
+  pointer-events: none;
+}
+
+.bracket-tl {
+  top: 0;
+  left: 0;
+  clip-path: polygon(0 0, 100% 0, 100% 4px, 4px 4px, 4px 100%, 0 100%);
+}
+
+.bracket-tr {
+  top: 0;
+  right: 0;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, calc(100% - 4px) 100%, calc(100% - 4px) 4px, 0 4px);
+}
+
+.bracket-bl {
+  bottom: 0;
+  left: 0;
+  clip-path: polygon(0 0, 4px 0, 4px calc(100% - 4px), 100% calc(100% - 4px), 100% 100%, 0 100%);
+}
+
+.bracket-br {
+  bottom: 0;
+  right: 0;
+  clip-path: polygon(calc(100% - 4px) 0, 100% 0, 100% 100%, 0 100%, 0 calc(100% - 4px), calc(100% - 4px) calc(100% - 4px));
+}
+
+.chest-body-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 14px;
+  background: linear-gradient(180deg, #fef08a 0%, #ca8a04 50%, #854d0e 100%);
+}
+
+.chest-body-band.band-left { left: 24px; }
+.chest-body-band.band-right { right: 24px; }
+
+.chest-lock-plate {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 32px;
+  height: 34px;
+  background: linear-gradient(180deg, #fef08a 0%, #eab308 50%, #92400e 100%);
+  border-radius: 6px;
+  border: 1px solid #78350f;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.5);
+  display: grid;
+  place-items: center;
+}
+
+.chest-lock-glow {
+  font-size: 14px;
+  animation: lock-gleam 1.5s ease-in-out infinite alternate;
+}
+
+@keyframes lock-gleam {
+  0% { transform: scale(0.9); opacity: 0.8; }
+  100% { transform: scale(1.15); opacity: 1; filter: drop-shadow(0 0 6px #facc15); }
+}
+
+.chest-lock-icon {
+  color: #451a03;
+}
+
+/* Volumetric God Rays */
+.chest-god-rays-emitter {
+  position: absolute;
+  top: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 340px;
+  height: 340px;
+  pointer-events: none;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chest-god-rays {
+  position: absolute;
+  width: 340px;
+  height: 340px;
+  border-radius: 50%;
+  background: repeating-conic-gradient(from 0deg, rgba(250, 204, 21, 0.38) 0deg 16deg, transparent 16deg 32deg);
+  mask-image: radial-gradient(circle at center, rgba(0, 0, 0, 1) 20%, transparent 70%);
+  -webkit-mask-image: radial-gradient(circle at center, rgba(0, 0, 0, 1) 20%, transparent 70%);
+  animation: god-rays-spin 14s linear infinite;
+}
+
+@keyframes god-rays-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.chest-god-glow {
+  position: absolute;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(circle at center, rgba(254, 240, 138, 0.7) 0%, rgba(245, 158, 11, 0.3) 50%, transparent 75%);
+  filter: blur(12px);
+  animation: glow-pulse 2s ease-in-out infinite alternate;
+}
+
+@keyframes glow-pulse {
+  0% { transform: scale(0.92); opacity: 0.8; }
+  100% { transform: scale(1.08); opacity: 1; }
+}
+
+/* Ambient Particles */
+.chest-ambient-particles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 6;
+}
+
+.particle-sparkle {
+  position: absolute;
+  color: #fde047;
+  font-size: 14px;
+  text-shadow: 0 0 8px #facc15;
+  animation: particle-float 2.2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+.particle-sparkle.p1 { top: 30%; left: 20%; animation-delay: 0s; }
+.particle-sparkle.p2 { top: 20%; right: 22%; animation-delay: 0.4s; }
+.particle-sparkle.p3 { top: 45%; left: 30%; animation-delay: 0.8s; }
+.particle-sparkle.p4 { top: 35%; right: 28%; animation-delay: 1.2s; }
+
+@keyframes particle-float {
+  0% { opacity: 0; transform: translateY(10px) scale(0.6); }
+  50% { opacity: 1; transform: translateY(-15px) scale(1.1); }
+  100% { opacity: 0; transform: translateY(-30px) scale(0.8); }
+}
+
+/* Chest Loot Reveal Container */
+.chest-loot-reveal {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: loot-emerge 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes loot-emerge {
+  0% {
+    opacity: 0;
+    transform: translateY(35px) scale(0.94);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.chest-reveal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.chest-replay-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 800;
+  background: linear-gradient(180deg, #facc15 0%, #ca8a04 100%);
+  color: #451a03;
+  border: 1px solid #fef08a;
+  box-shadow: 0 4px #854d0e, 0 6px 16px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.chest-replay-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 5px #854d0e, 0 8px 18px rgba(0, 0, 0, 0.4);
+}
+
+.chest-replay-btn:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px #854d0e;
+}
+
+.chest-status-callout {
+  width: 100%;
+  max-width: 440px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 16px;
+  margin: 0 auto;
+}
+
+.checkpoint-detail-card.reward-detail .detail-body-text {
+  color: #d1ebe5;
+  font-size: 15px;
+  line-height: 1.5;
+  max-width: 380px;
+  margin: 0;
+  font-weight: 500;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+.checkpoint-detail-card.reward-detail .primary-button.reward-open {
+  width: 100%;
+  max-width: 380px;
+  min-height: 54px;
+  background: linear-gradient(180deg, #fde047 0%, #eab308 50%, #ca8a04 100%);
+  color: #3f1a00;
+  border: 1.5px solid #fef08a;
+  border-radius: 14px;
+  font-size: 16px;
+  font-weight: 850;
+  letter-spacing: 0.02em;
+  box-shadow: 0 5px 0 #854d0e, 0 12px 28px rgba(0, 0, 0, 0.45);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.checkpoint-detail-card.reward-detail .primary-button.reward-open:hover {
+  background: linear-gradient(180deg, #fef08a 0%, #facc15 50%, #d97706 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 7px 0 #854d0e, 0 16px 32px rgba(0, 0, 0, 0.5);
+}
+
+.checkpoint-detail-card.reward-detail .primary-button.reward-open:active {
+  transform: translateY(3px);
+  box-shadow: 0 2px 0 #854d0e;
+}
+
+.checkpoint-detail-card.reward-detail .secondary-button {
+  width: 100%;
+  max-width: 380px;
+  min-height: 48px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #e2f1ee;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 750;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.checkpoint-detail-card.reward-detail .secondary-button:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chest-lid-assembly {
+    transition: none !important;
+  }
+  .interactive-3d-chest.is-shaking {
+    animation: none !important;
+  }
+  .chest-god-rays {
+    animation: none !important;
+  }
+  .chest-loot-reveal {
+    animation: none !important;
+  }
+  .particle-sparkle {
+    animation: none !important;
+  }
+}
+
+/* Lightbox Modal */
+.reward-lightbox-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(7, 26, 31, 0.88);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: reward-fade-in 0.2s ease-out;
+}
+
+@keyframes reward-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.reward-lightbox-card {
+  position: relative;
+  max-width: min(92vw, 760px);
+  max-height: 88vh;
+  background: #ffffff;
+  padding: 12px;
+  border-radius: 16px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+}
+
+.reward-lightbox-img {
+  width: 100%;
+  height: auto;
+  max-height: calc(88vh - 40px);
+  object-fit: contain;
+  border-radius: 10px;
+  display: block;
+}
+
+.reward-lightbox-close {
+  position: absolute;
+  top: -14px;
+  right: -14px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #f9d779;
+  border: 2px solid #ffffff;
+  color: #103d41;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  transition: transform 0.15s ease;
+}
+
+.reward-lightbox-close:hover {
+  transform: scale(1.1);
 }
 
 .avatar-studio-backdrop {
@@ -2903,7 +3925,7 @@ ul,ol {
 .streak-banner:before {
   z-index: -1;
   content: "";
-  background: linear-gradient(90deg,#173e30f7 5%,#173e30dc 65%,#173e30b8),url(/images/escape-island.png) 50% 64%/cover;
+  background: linear-gradient(90deg,#173e30f7 5%,#173e30dc 65%,#173e30b8),url(/images/escape-island.webp) 50% 64%/cover;
   position: absolute;
   inset: 0;
 }
@@ -5814,3 +6836,5 @@ html,body {
 .streak-screen .milestone-row:not(.earned):nth-child(3n + 2) .milestone-mark { background: #fca47c; color: #103d41; }
 .streak-screen .milestone-row:not(.earned):nth-child(3n) .milestone-mark { background: #23ced9; color: #103d41; }
 .streak-screen .milestone-row.earned .milestone-mark { background: #07545b; color: #fff; }
+
+

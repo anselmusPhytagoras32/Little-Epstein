@@ -136,7 +136,7 @@ async function checkIslandFit(width) {
   verify(fit.canvas.left >= fit.stage.left - 1 && fit.canvas.right <= fit.stage.right + 1, `The island fits the map width at ${width}px`);
   verify(Math.abs(fit.canvas.width / fit.canvas.height - 1 / 6) < .01, `The winding board preserves its 1:6 proportions at ${width}px`);
   verify(fit.scrollHeight > fit.clientHeight, `The complete 30-day route can be scrolled at ${width}px`);
-  verify(fit.background.includes('island-board-v2.png'), `The map uses the island artwork at ${width}px`);
+  verify(fit.background.includes('island-board-v2.webp') || fit.background.includes('island-board-v2.png'), `The map uses the island artwork at ${width}px`);
   const covered = await evaluate(`(() => {const find=document.querySelector('.locate-button').getBoundingClientRect();const stage=document.querySelector('.route-stage').getBoundingClientRect();return [...document.querySelectorAll('.map-location,.checkpoint')].filter(element=>{const r=element.getBoundingClientRect();const left=Math.max(r.left,stage.left),right=Math.min(r.right,stage.right),top=Math.max(r.top,stage.top),bottom=Math.min(r.bottom,stage.bottom);return left<right&&top<bottom&&find.left<right&&find.right>left&&find.top<bottom&&find.bottom>top}).map(element=>element.getAttribute('aria-label')||element.textContent.trim());})()`);
   verify(covered.length === 0, `Find me does not cover map labels or checkpoints at ${width}px: ${covered.join(', ')}`);
   const board = await evaluate(`(() => {const nodes=[...document.querySelectorAll('.checkpoint')];const rects=nodes.map(el=>el.getBoundingClientRect());const overlaps=[];for(let i=0;i<rects.length;i++)for(let j=i+1;j<rects.length;j++)if(rects[i].left<rects[j].right-1&&rects[i].right>rects[j].left+1&&rects[i].top<rects[j].bottom-1&&rects[i].bottom>rects[j].top+1)overlaps.push([i+1,j+1]);return {labels:nodes.map(el=>el.getAttribute('aria-label')),sizes:rects.map(r=>[r.width,r.height]),overlaps};})()`);
@@ -176,7 +176,7 @@ try {
   await viewport(390);
   await navigate("/", ".escape-screen .check-in-action");
   await waitFor("!document.querySelector('.check-in-action').disabled", "Practice island is ready");
-  verify(await evaluate("getComputedStyle(document.querySelector('.map-mascot .mascot-portrait')).backgroundImage.includes('mascot.png')"), "The supplied mascot appears on the island");
+  verify(await evaluate("getComputedStyle(document.querySelector('.map-mascot .mascot-portrait')).backgroundImage.includes('mascot.')"), "The supplied mascot appears on the island");
   verify(await evaluate("!!document.querySelector('.map-self-avatar .player-avatar.avatar-fern') && !!document.querySelector('.map-mascot .mascot-portrait')"), "The player's default explorer and pursuing mascot appear on the route");
   verify(await evaluate(`(async () => {const sprite=document.querySelector('.map-self-avatar .avatar-sprite');if(!sprite)return false;const match=getComputedStyle(sprite).backgroundImage.match(/url\(["']?(.*?)["']?\)/);if(!match)return false;const image=new Image();image.src=match[1];try{await image.decode();return image.naturalWidth>0}catch{return false}})()`), "The swimmer portrait artwork loads successfully");
   verify(await evaluate("getComputedStyle(document.querySelector('.map-self-avatar .player-avatar')).animationName === 'swimmer-stroke' && getComputedStyle(document.querySelector('.map-mascot .mascot-portrait')).animationName === 'mascot-chase' && getComputedStyle(document.querySelector('.swim-wake')).animationName === 'swim-ripple'"), "The player swims with a wake and the pursuing mascot animates");
@@ -188,7 +188,7 @@ try {
   await checkIslandFit(390);
   await waitFor(`(() => {const stage=document.querySelector('.route-stage');const rect=stage.getBoundingClientRect();const day=document.querySelector('.checkpoint[aria-label^="Day 1:"]').getBoundingClientRect();return stage.scrollTop>0 && day.top>=rect.top && day.bottom<=rect.bottom})()`, "The board opens at day 1");
   verify(await evaluate(`(() => {const stage=document.querySelector('.route-stage');const rect=stage.getBoundingClientRect();const day=document.querySelector('.checkpoint[aria-label^="Day 1:"]').getBoundingClientRect();return stage.scrollTop>0 && day.top>=rect.top && day.bottom<=rect.bottom})()`), "A fresh route opens at the player's starting checkpoint");
-  verify(await evaluate(`(async () => {const image=new Image();image.src='/images/island-board-v2.png';try{await image.decode();return image.naturalWidth>0&&image.naturalHeight>0}catch{return false}})()`), "The island artwork loads successfully");
+  verify(await evaluate(`(async () => {const image=new Image();image.src='/images/island-board-v2.webp';try{await image.decode();return image.naturalWidth>0&&image.naturalHeight>0}catch{return false}})()`), "The island artwork loads successfully");
   await capture("mobile.png");
   await click(".treasure-chest");
   await waitFor("!!document.querySelector('.reward-detail')", "Reward chest opens its details");

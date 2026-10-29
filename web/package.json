@@ -11,6 +11,7 @@
         "lint": "eslint app lib scripts",
         "ui:check": "node scripts/ui-check.mjs",
         "db:migrate": "node scripts/migrate.mjs",
+        "assets:webp": "node scripts/convert-webp.mjs",
         "push:keys": "node scripts/generate-vapid.mjs",
         "sweep": "node scripts/sweep.mjs"
     },
@@ -35,6 +36,7 @@
         "react-hook-form": "7.91.0",
         "react-resizable-panels": "4.15.0",
         "recharts": "3.10.0",
+        "sharp": "^0.35.5",
         "sonner": "2.0.8",
         "tailwind-merge": "3.6.0",
         "tailwindcss": "4.2.1",
