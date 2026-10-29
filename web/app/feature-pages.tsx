@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type FormEvent, type ReactNode, useState } from "react";
+import { type FormEvent, type ReactNode, useRef, useState } from "react";
 import {
-  ArrowRight, Bell, CalendarDays, Check, CheckCircle2, ChevronLeft, ChevronRight, Copy,
+  ArrowRight, Bell, CalendarDays, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Copy,
   Download, Flame, Flag, Heart, LockKeyhole, LogOut, MapPin, Plus,
   ShieldCheck, Sparkles, Trophy, UserRound, UsersRound,
 } from "lucide-react";
@@ -56,7 +56,7 @@ function LoadingPage() {
 }
 
 function AccountPrompt({ children }: { children?: ReactNode }) {
-  return <div className="surface stack">
+  return <div className="surface stack account-prompt">
     <span className="page-symbol"><UsersRound size={25} /></span>
     <h2>Bring your crew along.</h2>
     <p>{children || "Create an account to start a private room, invite friends, and share the November escape."}</p>
@@ -65,12 +65,20 @@ function AccountPrompt({ children }: { children?: ReactNode }) {
 }
 
 const milestones = [
-  { days: 1, name: "First step", description: "One honest check-in. Your route has begun." },
-  { days: 3, name: "Finding your feet", description: "Three days of showing up for yourself." },
-  { days: 7, name: "A week on the island", description: "Seven consecutive daily check-ins." },
-  { days: 14, name: "The halfway habit", description: "Two full weeks of keeping your word." },
-  { days: 21, name: "The final stretch", description: "Three weeks down. Keep your boat in sight." },
-  { days: 30, name: "Off the island", description: "Finish the November escape with your crew." },
+  { days: 1, name: "The first step", description: "Your escape begins with one honest day." },
+  { days: 3, name: "Finding your rhythm", description: "Three days of showing up." },
+  { days: 7, name: "One week strong", description: "A full week on the trail." },
+  { days: 14, name: "Halfway there", description: "Two weeks behind you." },
+  { days: 21, name: "The final stretch", description: "Three weeks closer to the boat." },
+  { days: 30, name: "Off the island", description: "Thirty honest days. You made it." },
+];
+
+const gameRules = [
+  { icon: CalendarDays, title: "November is your escape window.", text: "The challenge runs November 1–30, 2026. Your room follows its host's time zone, so the whole crew has one shared deadline." },
+  { icon: CheckCircle2, title: "One honest tap, every day.", text: "Open the app and log your day before your room's midnight. Opening the app alone does not count as a check-in." },
+  { icon: Flag, title: "The rules are strict.", text: "Miss a day or report a slip and your run ends. There are no restore credits or make-up check-ins." },
+  { icon: ShieldCheck, title: "Keep your report private.", text: "Your friends see your game status. The reason for an elimination is not shown in your room's activity." },
+  { icon: UsersRound, title: "Get off the island together.", text: "Invite friends before the month starts. Everyone still standing after November 30 wins. Spectators can keep encouraging the crew." },
 ];
 
 export function StreakPage() {
@@ -105,9 +113,9 @@ export function StreakPage() {
       <p className="calendar-key"><span/> Checked in <i/> Today</p>
     </section>
     <Link className="primary-button" href="/">{game.checked ? "Back to your escape" : "Go to today's check-in"}<MapPin size={17} /></Link>
-    <section className="stack"><h2>Little wins along the way</h2><ol className="milestone-list">{milestones.map((milestone) => {
+    <section className="milestones-section"><div className="milestones-heading"><div><h2>Your escape milestones</h2><p>Every day brings you closer.</p></div><span>{milestones.filter(milestone => game.streak >= milestone.days).length} / {milestones.length} reached</span></div><ol className="milestone-list">{milestones.map((milestone) => {
       const earned = game.streak >= milestone.days;
-      return <li key={milestone.days} className={`milestone-row${earned ? " earned" : ""}`}><span className="milestone-mark">{earned ? <Check size={20} /> : milestone.days === 30 ? <Trophy size={20} /> : <Flame size={20} />}</span><span className="milestone-copy"><strong>{milestone.name}</strong><small>{milestone.days}-day streak · {earned ? "Unlocked this run" : milestone.description}</small></span>{earned && <CheckCircle2 size={18} aria-label="Unlocked" />}</li>;
+      return <li key={milestone.days} className={`milestone-row${earned ? " earned" : ""}`}><span className="milestone-mark" aria-label={`${milestone.days} ${milestone.days === 1 ? "day" : "days"}`}><strong>{milestone.days}</strong><small>{milestone.days === 1 ? "DAY" : "DAYS"}</small></span><span className="milestone-copy"><strong>{milestone.name}</strong><small>{milestone.description}</small></span><span className="milestone-state">{earned ? <><Check size={14} /> Reached</> : "Ahead"}</span></li>;
     })}</ol></section>
     <Link className="text-link" href="/how-to">How the daily streak works <ChevronRight size={16} /></Link>
   </section>;
@@ -133,34 +141,88 @@ export function CrewPage() {
     setCheering("");
   }
 
+  const hasRoom = game.mode === "online" && !!game.room.id;
+
   return <section className="screen crew-screen">
-    <Heading title="Better with your crew.">{game.mode === "practice" ? "A private room turns a daily check-in into something you do together." : "A little encouragement goes a long way on the island."}</Heading>
-    {game.mode === "practice" ? <AccountPrompt /> : <section className="surface crew-summary stack">
+    <Heading title={hasRoom ? "Your crew" : "Your escape crew"}>{game.mode === "practice" ? "You’re playing solo practice on this device." : hasRoom ? "See who’s still in and cheer each other on." : "Create or join a private room to play with friends."}</Heading>
+    {game.mode === "practice" ? <section className="crew-invite">
+      <div className="crew-invite-intro">
+        <div><span className="crew-invite-tag">YOUR NEXT MOVE</span><h2>Don&apos;t escape alone.</h2><p>Make a private room and keep up with your friends on the island.</p></div>
+        <span className="mascot-portrait mascot-hungry crew-invite-mascot" role="img" aria-label="The island mascot" />
+      </div>
+      <div className="page-actions"><Link className="primary-button" href="/account/register">Create an account <ArrowRight size={18} /></Link><Link className="secondary-button" href="/account/sign-in">Already have an account? Sign in</Link></div>
+    </section> : <section className="surface crew-summary stack">
+      {!hasRoom ? <><h2>Find your crew</h2><p>Create a room or join a friend with an invitation.</p><div className="page-actions"><Link className="primary-button" href="/rooms/create"><Plus size={17} />Create a room</Link><Link className="secondary-button" href="/rooms/join"><UsersRound size={17} />Join a room</Link></div></> : <>
       <div className="section-heading"><h2>{game.room.name}</h2><span className="status-pill"><UsersRound size={13} />Private room</span></div>
       <div className="stat-grid"><div><strong>{alive}<small>/{players.length}</small></strong><span>Still in</span></div><div><strong>{checkedIn}</strong><span>Logged today</span></div><div><strong>{ROOM_LIMIT - players.length}</strong><span>Open places</span></div></div>
       <p className="field-hint"><CalendarDays size={14} />Midnight deadline: {game.room.timezone}</p>
       <button className="primary-button" disabled={action.pending} onClick={() => void action.run(game.copyInvite, "Invitation copied. Send it to your friends.")}><Copy size={17} />{action.pending ? "Working…" : "Copy invitation link"}</button>
+      </>}
     </section>}
     <Feedback error={action.error} success={action.success} />
-    <section className="stack"><div className="section-heading"><h2>{game.mode === "practice" ? "Your practice run" : "The leaderboard"}</h2><span>{displayedPlayers.length} {displayedPlayers.length === 1 ? "escapee" : "escapees"}</span></div>
+    {(game.mode === "practice" || hasRoom) && <section className="stack crew-roster"><div className="section-heading"><h2>{game.mode === "practice" ? "Your practice run" : "Crew status"}</h2>{hasRoom && <span>{displayedPlayers.length} {displayedPlayers.length === 1 ? "player" : "players"}</span>}</div>
       <ol className="leaderboard-list member-list">{displayedPlayers.map((player, index) => <li className="leaderboard-row member-row" key={`${player.name}-${index}`}>
-        <span className="rank-number">{index + 1}</span>
+        {hasRoom && <span className="rank-number">{index + 1}</span>}
         <span className="member-avatar-mascot">
           <PlayerAvatar avatarId={player.avatarId} accent={player.avatarAccent} size={36} animated={false} />
         </span>
-        <div className="member-info"><strong>{player.self ? game.username || "You" : player.name}{player.self && <small>YOU</small>}</strong><span>{player.won ? "Escaped the island" : !player.alive ? "Spectating this round" : player.checkedIn ? "Checked in today" : "Today's check-in is waiting"}</span><span className="member-streak"><Flame size={12} />{player.streak}-day streak</span></div>
+        <div className="member-info"><strong>{player.self ? game.username || "You" : player.name}{player.self && game.username && game.username !== "You" && <small>YOU</small>}</strong><span>{player.won ? "Escaped the island" : !player.alive ? "Spectating this round" : player.checkedIn ? "Checked in today" : "Today's check-in is waiting"}</span><span className="member-streak"><Flame size={14} />{player.streak}-day streak</span></div>
         {!player.self && game.mode === "online" ? <button className="member-action" aria-label={`Cheer for ${player.name}`} title={`Cheer for ${player.name}`} disabled={action.pending} onClick={() => void cheer(player.name)}>{cheering === player.name ? <span className="button-spinner" /> : <Heart size={18} />}</button> : player.checkedIn ? <CheckCircle2 size={21} className="member-checked" aria-label="Checked in" /> : <Flame size={21} className="member-waiting" aria-label="Waiting to check in" />}
       </li>)}</ol>
-    </section>
-    <div className="page-actions"><Link className="secondary-button" href="/rooms/create"><Plus size={17} />Create a room</Link><Link className="secondary-button" href="/rooms/join"><UsersRound size={17} />Join a room</Link></div>
-    <p className="field-hint"><ShieldCheck size={15} />Your crew sees your status. The reason for an elimination stays private.</p>
+    </section>}
+    {hasRoom && <div className="page-actions"><Link className="secondary-button" href="/rooms/create"><Plus size={17} />Create another room</Link><Link className="secondary-button" href="/rooms/join"><UsersRound size={17} />Join another room</Link></div>}
+    {hasRoom && <p className="field-hint"><ShieldCheck size={15} />Your crew sees your status. The reason for an elimination stays private.</p>}
   </section>;
+}
+
+function SettingsAccount() {
+  const game = useGame();
+  const action = usePageAction();
+  const [register, setRegister] = useState(false);
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const values = new FormData(event.currentTarget);
+    const credentials = { email: String(values.get("email") || ""), password: String(values.get("password") || "") };
+    void action.run(async () => {
+      if (register) await game.register({ ...credentials, username: String(values.get("username") || ""), over18: values.get("over18") === "on" });
+      else await game.signIn(credentials);
+    }, register ? "Account created." : "You’re signed in.");
+  }
+
+  if (game.mode === "online") return <div className="settings-panel-body"><p>Signed in as <strong>{game.username}</strong>.</p><Feedback error={action.error} success={action.success} /><button className="secondary-button" disabled={action.pending || game.busy} onClick={() => void action.run(game.signOut, "Signed out.")}><LogOut size={17} />{action.pending ? "Signing out…" : "Sign out"}</button></div>;
+  return <div className="settings-panel-body"><p>Sign in to play with friends, or create an account.</p><form className="form-stack" onSubmit={submit}>
+    {register && <label className="form-field"><span>Display name</span><input name="username" autoComplete="nickname" minLength={2} maxLength={24} required /></label>}
+    <label className="form-field"><span>Email</span><input name="email" type="email" autoComplete="email" required /></label>
+    <label className="form-field"><span>Password</span><input name="password" type="password" minLength={8} maxLength={128} autoComplete={register ? "new-password" : "current-password"} required /></label>
+    {register && <label className="check-field"><input name="over18" type="checkbox" required /><span>I confirm that I am 18 years old or older.</span></label>}
+    <Feedback error={action.error} success={action.success} />
+    <button className="primary-button" disabled={action.pending || game.busy}>{action.pending ? "One moment…" : register ? "Create account" : "Sign in"}<ArrowRight size={17} /></button>
+  </form><button className="settings-switch" type="button" onClick={() => setRegister(!register)}>{register ? "Already have an account? Sign in" : "New here? Create an account"}</button></div>;
+}
+
+function SettingsReport() {
+  const game = useGame();
+  const action = usePageAction();
+  const [confirmed, setConfirmed] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  if (game.me.won) return <div className="settings-panel-body"><p>You escaped! Your run is complete and cannot be reported.</p></div>;
+  if (submitted || !game.me.alive) return <div className="settings-panel-body"><p>{submitted ? "Your report is saved. " : "Your run has ended. "}{game.mode === "practice" ? "You can start a fresh local practice." : "You can still cheer on your crew."}</p>{game.mode === "practice" && <button className="secondary-button" onClick={() => { game.resetPractice(); setSubmitted(false); setConfirmed(false); }}>Start a fresh practice <Flag size={17} /></button>}</div>;
+  if (game.mode === "online" && (game.isPregame || game.seasonFinished)) return <div className="settings-panel-body"><p>Your competitive run isn’t active. Reports apply during November 1–30.</p></div>;
+  return <form className="settings-panel-body form-stack" onSubmit={event => { event.preventDefault(); if (confirmed) void action.run(async () => { await game.reportSlip(); setSubmitted(true); }); }}>
+    <p>{game.mode === "practice" ? "This ends your local practice run." : "This ends your run in every active room you’ve joined."} Your crew sees your status, not your reason. Streaks cannot be restored.</p>
+    <label className="check-field"><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} required /><span>I understand that my run ends now.</span></label>
+    <Feedback error={action.error} success={action.success} /><button className="primary-button danger-button" disabled={!confirmed || action.pending || game.busy}>{action.pending ? "Saving your report…" : "Confirm and end my run"}<Flag size={17} /></button>
+  </form>;
 }
 
 export function SettingsPage() {
   const game = useGame();
   const action = usePageAction();
   const avatarAction = usePageAction();
+  const deviceAction = usePageAction();
+  const installAction = usePageAction();
+  const accountDetails = useRef<HTMLDetailsElement>(null);
   if (!game.ready) return <LoadingPage />;
 
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -170,26 +232,32 @@ export function SettingsPage() {
   }
 
   return <section className="screen settings-screen">
-    <Heading title="Make it your daily ritual.">Choose a reminder that gives you time to check in before your room&apos;s midnight.</Heading>
+    <Heading title="Make the island yours.">Choose your swimmer and set up your daily routine.</Heading>
     {game.mode === "practice" && <p className="practice-banner"><Flag size={15} />Practice preferences are saved on this device.</p>}
     <section id="avatar" className="avatar-picker-card">
-      <div className="avatar-picker-heading"><div className="avatar-hero-preview"><PlayerAvatar size={84}/></div><div className="avatar-hero-info"><h2>Choose your swimmer</h2><p>Pick a character and an accent. Your crew sees your choice.</p></div></div>
-      <fieldset className="avatar-options" disabled={avatarAction.pending || game.busy}><legend>Character</legend>{AVATAR_IDS.map((id, index) => <label className={`avatar-option${game.me.avatarId === id ? " is-selected" : ""}`} key={id}><input type="radio" name="avatar" value={id} checked={game.me.avatarId === id} onChange={() => void avatarAction.run(() => game.setAvatar(id), "Character saved.")}/><PlayerAvatar avatarId={id} accent={game.me.avatarAccent}/><span>{["Explorer", "Survivor", "Fisherman", "Medic", "Builder", "Scout", "Chef", "Diver"][index]}</span></label>)}</fieldset>
+      <div className="avatar-picker-heading"><div className="avatar-hero-preview"><PlayerAvatar size={72}/></div><div className="avatar-hero-info"><h2>Your swimmer</h2><p>{game.mode === "practice" ? "Pick your look for this practice." : "Your crew will see your look on the map."}</p></div></div>
+      <fieldset className="avatar-options" disabled={avatarAction.pending || game.busy}><legend>Choose a character</legend>{AVATAR_IDS.map((id, index) => <label className={`avatar-option${game.me.avatarId === id ? " is-selected" : ""}`} key={id}><input type="radio" name="avatar" value={id} checked={game.me.avatarId === id} onChange={() => void avatarAction.run(() => game.setAvatar(id), "Character saved.")}/><PlayerAvatar avatarId={id} accent={game.me.avatarAccent}/><span>{["Explorer", "Survivor", "Fisherman", "Medic", "Builder", "Scout", "Chef", "Diver"][index]}</span>{game.me.avatarId === id && <Check className="avatar-option-check" size={13} aria-hidden="true" />}</label>)}</fieldset>
       <fieldset className="avatar-accent-options" disabled={avatarAction.pending || game.busy}><legend>Accent color</legend>{AVATAR_ACCENTS.map(accent => <label className={`avatar-accent-option${game.me.avatarAccent === accent ? " is-selected" : ""}`} key={accent}><input type="radio" name="avatarAccent" value={accent} checked={game.me.avatarAccent === accent} onChange={() => void avatarAction.run(() => game.setAvatarAccent(accent), "Accent saved.")}/><span className={`accent-swatch accent-${accent}`}/>{accent.charAt(0).toUpperCase() + accent.slice(1)}</label>)}</fieldset>
       <Feedback error={avatarAction.error} success={avatarAction.success}/>
     </section>
-    <form className="surface form-stack" onSubmit={submit}>
+    <form className="surface form-stack settings-routine" onSubmit={submit}>
+      <div><h2>Your daily routine</h2><p>Set a name and an optional reminder time.</p></div>
       <label className="form-field"><span>Display name</span><input name="username" defaultValue={game.username || "Explorer"} minLength={2} maxLength={24} autoComplete="nickname" required /></label>
       <label className="form-field"><span>Daily reminder</span><input name="reminder" type="time" defaultValue={game.reminder} /></label>
       <p className="field-hint">Reminder time zone: {game.reminderTimezone}. Clear the reminder time to turn the schedule off.</p>
       <Feedback error={action.error} success={action.success} />
-      <button className="primary-button" disabled={action.pending || game.busy}>{action.pending ? "Saving your routine…" : "Save my routine"}<Check size={17} /></button>
+      <button className="primary-button" disabled={action.pending || game.busy}>{action.pending ? "Saving…" : "Save changes"}<Check size={17} /></button>
     </form>
-    <section className="stack"><h2>A friendly nudge</h2><p>Background reminders are optional. Your check-in still needs an honest tap inside the app.</p>
-      {game.mode === "online" ? <button className="secondary-button" disabled={action.pending} onClick={() => void action.run(game.enablePush, "This device is ready for your opted-in reminders.")}><Bell size={17} />Turn on background reminders</button> : <Link className="secondary-button" href="/account/register"><Bell size={17} />Create an account for reminders</Link>}
+    <section className="settings-device"><div className="settings-device-heading"><span className="settings-device-icon"><Bell size={21} /></span><div><h2>Never miss a check-in</h2><p>Reminders are optional. You still need to check in yourself.</p></div></div>
+      {game.mode === "online" ? <button className="secondary-button" disabled={deviceAction.pending} onClick={() => void deviceAction.run(game.enablePush, "This device is ready for your opted-in reminders.")}><Bell size={17} />Enable reminders</button> : <button className="secondary-button" onClick={() => { if (accountDetails.current) { accountDetails.current.open = true; accountDetails.current.scrollIntoView({ block: "start", behavior: "auto" }); } }}><UserRound size={17} />Sign in to enable reminders</button>}
+      <Feedback error={deviceAction.error} success={deviceAction.success} />
     </section>
-    <section className="stack"><h2>Your island, one tap away</h2><p>Keep the escape on your home screen for a quick daily check-in.</p>{game.installed ? <p className="inline-success"><CheckCircle2 size={17} />You are using the installed app.</p> : <button className="secondary-button" onClick={() => void action.run(game.installApp)}><Download size={17} />Install the app</button>}</section>
-    <div className="link-list"><Link className="link-row" href="/account"><UserRound size={18} /><span>Your account</span><ChevronRight size={17} /></Link><Link className="link-row" href="/how-to"><ShieldCheck size={18} /><span>Game rules</span><ChevronRight size={17} /></Link><Link className="link-row" href="/report"><Flag size={18} /><span>Report a slip honestly</span><ChevronRight size={17} /></Link></div>
+    <section className="settings-install"><div><h2>Your island, one tap away</h2><p>Add the app to your home screen for easy access.</p></div>{game.installed ? <p className="settings-installed"><CheckCircle2 size={17} />App installed</p> : <button className="secondary-button" disabled={installAction.pending} onClick={() => void installAction.run(game.installApp)}><Download size={17} />Install app</button>}<Feedback error={installAction.error} success={installAction.success} /></section>
+    <section className="settings-more" aria-label="Account and game information">
+      <details ref={accountDetails} className="settings-disclosure"><summary><UserRound size={20} /><span><strong>Your account</strong><small>{game.mode === "online" ? "Account and sign out" : "Sign in or create an account"}</small></span><ChevronDown size={19} /></summary><SettingsAccount /></details>
+      <details className="settings-disclosure"><summary><ShieldCheck size={20} /><span><strong>Game rules</strong><small>How the escape works</small></span><ChevronDown size={19} /></summary><div className="settings-panel-body settings-rules"><ol>{gameRules.map(rule => <li key={rule.title}><strong>{rule.title}</strong><p>{rule.text}</p></li>)}</ol></div></details>
+      <details className="settings-disclosure"><summary><Flag size={20} /><span><strong>Report a slip</strong><small>Read before ending your run</small></span><ChevronDown size={19} /></summary><SettingsReport /></details>
+    </section>
   </section>;
 }
 
@@ -227,8 +295,10 @@ function AuthPage({ register }: { register: boolean }) {
   }
 
   return <section className="screen auth-screen">
-    <span className="page-symbol"><LockKeyhole size={26} /></span>
-    <Heading title={register ? "Save a place for your crew." : "Welcome back to the island."}>{game.invitation ? "Your friend's invitation is saved. Sign in or create an account to join their crew." : register ? "Create your account and invite friends into your own November escape." : "Your crew and your honest daily check-in are waiting."}</Heading>
+    <header className="auth-intro">
+      <div className="auth-intro-copy"><span className="auth-intro-tag">{register ? "JOIN THE ESCAPE" : "WELCOME BACK"}</span><h1>{register ? "Bring your crew along." : "Back to the island."}</h1><p>{game.invitation ? "Your friend’s invite is saved. Sign in or create an account to join them." : register ? "Create an account to invite friends and track your escape together." : "Sign in to find your crew and continue your escape."}</p></div>
+      <span className="mascot-portrait mascot-worried auth-mascot" role="img" aria-label="The island mascot" />
+    </header>
     {game.mode === "online" ? <section className="surface stack"><p>You are already signed in as {game.username}.</p><Link className="primary-button" href="/crew">Go to your crew <ArrowRight size={17} /></Link></section> : <>
       <form className="form-stack" onSubmit={submit}>
         {register && <label className="form-field"><span>Display name</span><input name="username" autoComplete="nickname" placeholder="A name your friends know" minLength={2} maxLength={24} required /></label>}
@@ -353,16 +423,9 @@ export function ReportPage() {
 
 export function HowToPage() {
   const game = useGame();
-  const rules = [
-    { icon: CalendarDays, title: "November is your escape window.", text: "The challenge runs November 1–30, 2026. Your room follows its host's time zone, so the whole crew has one shared deadline." },
-    { icon: CheckCircle2, title: "One honest tap, every day.", text: "Open the app and log your day before your room's midnight. Opening the app alone does not count as a check-in." },
-    { icon: Flag, title: "The rules are strict.", text: "Miss a day or report a slip and your run ends. There are no restore credits or make-up check-ins." },
-    { icon: ShieldCheck, title: "Keep your report private.", text: "Your friends see your game status. The reason for an elimination is not shown in your room's activity." },
-    { icon: UsersRound, title: "Get off the island together.", text: "Invite friends before the month starts. Everyone still standing after November 30 wins. Spectators can keep encouraging the crew." },
-  ];
   return <section className="screen rules-screen">
     <Heading title="An honest escape." >A quick daily ritual, a private crew, and one November route to finish.</Heading>
-    <ol className="rule-list">{rules.map(({ icon: Icon, title, text }) => <li className="rule-row" key={title}><span className="page-symbol"><Icon size={22} /></span><div><h2>{title}</h2><p>{text}</p></div></li>)}</ol>
+    <ol className="rule-list">{gameRules.map(({ icon: Icon, title, text }) => <li className="rule-row" key={title}><span className="page-symbol"><Icon size={22} /></span><div><h2>{title}</h2><p>{text}</p></div></li>)}</ol>
     <p className="field-hint"><MapPin size={16} />{game.mode === "online" ? `Your room's time zone: ${game.room.timezone}.` : "Local practice is a preview on this device. Create an account for an online room."}</p>
     <Link className="primary-button" href="/">Back to the route <ArrowRight size={17} /></Link>
     <Link className="secondary-button" href="/report">Report a slip honestly <Heart size={17} /></Link>

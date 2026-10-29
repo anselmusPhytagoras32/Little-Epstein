@@ -2,15 +2,18 @@
 name: Escape the Epstein
 description: A playful island escape with an honest daily ritual and a private crew.
 colors:
-  paper: "#fcfaf4"
-  white: "#fffefa"
-  ink: "#213f34"
-  muted: "#65756b"
-  forest: "#285e46"
-  forest-dark: "#194b36"
-  pale: "#edf2e8"
-  amber: "#e9ae50"
-  line: "#e8e6dc"
+  paper: "#a1cca6"
+  white: "#dff0dc"
+  ink: "#103d41"
+  muted: "#315e5e"
+  forest: "#086870"
+  forest-dark: "#07545b"
+  pale: "#bfe5cf"
+  amber: "#f9d779"
+  line: "#80bca5"
+  ocean: "#097c87"
+  turquoise: "#23ced9"
+  coral: "#fca47c"
   danger: "#a84736"
 typography:
   display:
@@ -91,7 +94,7 @@ components:
 
 ## Overview
 
-The visual system pairs an illustrated tropical expedition with a calm daily ritual. Forest controls, warm paper surfaces, amber trail markers, and compact system type keep the game playful while the saved check-in remains clear.
+The visual system pairs an illustrated tropical expedition with the tropical jade sunrise palette. Sage surfaces, deep ocean controls, turquoise highlights, coral and sun-yellow accents, and compact system type make progress clear while keeping the island playful.
 
 The island is the signature artwork. Supporting screens use quieter stacked content, familiar controls, and generous space around the main action. The same portrait phone shell applies in a wide browser and an installed PWA.
 
@@ -104,7 +107,7 @@ The island is the signature artwork. Supporting screens use quieter stacked cont
 
 ## Colors
 
-The palette uses forest for action, amber for progress, and warm neutrals for readable supporting content. The frontmatter records the reusable color primitives from the global stylesheet.
+The supplied palette uses ocean teal for action, sage for the main canvas, pale jade for surfaces, and coral and sun yellow for warm accents. Darker teal and lighter jade variations keep text and controls readable. The frontmatter records the reusable color primitives from the global stylesheet.
 
 ### Primary
 

@@ -142,6 +142,10 @@ class ContraAudioEngine {
     });
   }
 
+  public playPowerup() {
+    this.playRevive();
+  }
+
   public playDash() {
     if (!this.enabled) return;
     const ctx = this.getContext();

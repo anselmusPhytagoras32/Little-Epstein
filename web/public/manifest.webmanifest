@@ -8,8 +8,8 @@
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
   "orientation": "portrait",
-  "background_color": "#fcfaf4",
-  "theme_color": "#fcfaf4",
+  "background_color": "#a1cca6",
+  "theme_color": "#097c87",
   "categories": ["games", "lifestyle"],
   "screenshots": [
     {

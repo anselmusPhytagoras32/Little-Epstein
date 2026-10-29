@@ -1,56 +1,935 @@
-.boss-screen { position: fixed; z-index: 1000; inset: 0; overflow: hidden; background: #092b35; color: #fffbea; }
-.boss-landscape { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 4px; padding: max(6px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(5px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); }
-.boss-hud { display: flex; min-height: 42px; flex-shrink: 0; align-items: center; justify-content: center; gap: clamp(6px, 2vw, 20px); }
-.boss-back { display: inline-flex; min-width: 44px; min-height: 40px; align-items: center; gap: 5px; color: #e2f3e9; font-size: 12px; font-weight: 700; }
-.boss-health { display: flex; min-width: 0; flex: 1; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; }
-.boss-health>div { height: 10px; flex: 1; overflow: hidden; border-radius: 5px; background: #ffffff2b; }
-.boss-health i { display: block; height: 100%; border-radius: inherit; background: #94d58d; transition: width .15s; }
-.boss-health.enemy i { background: #f39372; }
-.boss-health b { min-width: 25px; font-variant-numeric: tabular-nums; }
-.boss-timer { min-width: 52px; text-align: center; color: #ffe096; font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
-.boss-playfield { position: relative; min-height: 0; flex: 1; overflow: hidden; border: 1px solid #8bcabf61; border-radius: 14px; background: #125e6b; }
-.boss-playfield canvas { display: block; width: 100%; height: 100%; object-fit: contain; }
-.boss-intro { position: absolute; inset: 0; display: grid; place-items: center; overflow-y: auto; padding: 12px; background: #061e2bd9; }
-.boss-intro-card { display: grid; width: min(100%, 420px); justify-items: center; gap: 8px; padding: 12px; text-align: center; }
-.boss-kicker { color: #ffcf70; font-size: 10px; font-weight: 800; letter-spacing: .08em; }
-.boss-intro h1 { color: #fffbea; font-size: clamp(20px, 5vh, 30px); line-height: 1.1; }
-.boss-intro p { max-width: 390px; color: #d3e8df; font-size: 12px; line-height: 1.4; }
-.boss-intro p.boss-small { color: #a8c8c5; font-size: 10px; }
-.boss-results { display: grid; width: 100%; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
-.boss-results>div { display: grid; gap: 3px; padding: 7px 3px; border-radius: 8px; background: #ffffff12; }
-.boss-results strong { color: #ffe096; font-size: 15px; font-variant-numeric: tabular-nums; }
-.boss-results span { color: #d3e8df; font-size: 9px; }
-.boss-start { min-width: 170px; min-height: 42px; padding: 9px 18px; border: 0; border-radius: 11px; background: #f4c75f; color: #4a321a; font-size: 13px; font-weight: 800; }
-.boss-start:disabled { opacity: .6; }
-.boss-exit { min-height: 32px; color: #e2f3e9; font-size: 11px; text-decoration: underline; text-underline-offset: 3px; }
-.boss-intro p.boss-error { color: #ffd2bf; }
-.boss-hud-actions { display: flex; align-items: center; gap: 8px; }
-.boss-sound-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 36px; min-height: 36px; border: 1px solid #ffffff30; border-radius: 8px; background: #0c3340; color: #ffe096; cursor: pointer; transition: background .15s, transform .1s; }
-.boss-sound-btn:hover { background: #134658; }
-.boss-sound-btn:active { transform: scale(0.95); }
-.boss-powerup-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 6px; font-size: 10px; font-weight: 800; letter-spacing: .04em; }
-.boss-powerup-badge.spread { background: #f59e0b33; border: 1px solid #f59e0b; color: #fde68a; }
-.boss-powerup-badge.shield { background: #3b82f633; border: 1px solid #60a5fa; color: #bfdbfe; }
-.boss-powerup-badge.speed { background: #10b98133; border: 1px solid #34d399; color: #a7f3d0; }
-.boss-controls { position: absolute; right: clamp(14px, 4vw, 38px); bottom: 12px; left: clamp(14px, 4vw, 38px); display: flex; align-items: end; justify-content: space-between; pointer-events: none; }
-.boss-actions-cluster { display: flex; align-items: center; gap: 12px; pointer-events: auto; }
-.boss-joystick, .boss-attack, .boss-dash { touch-action: none; user-select: none; pointer-events: auto; }
-.boss-joystick { position: relative; display: grid; width: clamp(76px, 16vh, 110px); aspect-ratio: 1; place-items: center; border: 2px solid #e6fff58c; border-radius: 50%; background: #0a304b80; }
-.boss-joystick span { display: block; width: 42%; aspect-ratio: 1; border: 2px solid #f3fff7; border-radius: 50%; background: #c2e3d8bd; }
-.boss-dash { display: grid; width: clamp(54px, 11vh, 74px); aspect-ratio: 1; place-items: center; border: 2px solid #93c5fd; border-radius: 50%; background: #1e3a8a; box-shadow: 0 3px 0 #172554; color: #eff6ff; font-size: 11px; font-weight: 800; }
-.boss-dash:active { background: #2563eb; transform: scale(.95); }
-.boss-dash:disabled { opacity: .5; filter: grayscale(.5); }
-.boss-attack { display: grid; width: clamp(70px, 14vh, 98px); aspect-ratio: 1; place-items: center; border: 3px solid #ffe6a7; border-radius: 50%; background: #ca5e39; box-shadow: 0 3px 0 #813f2b; color: white; font-size: 12px; font-weight: 850; }
-.boss-attack:active { background: #f2944b; transform: scale(.95); }
-.boss-squad-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 8px; background: #0c3340; border: 1px solid #38bdf880; color: #38bdf8; font-size: 11px; font-weight: 800; letter-spacing: 0.04em; }
-.boss-squad-selector { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 4px 0; }
-.boss-squad-btn { padding: 5px 12px; border-radius: 8px; border: 1px solid #ffffff25; background: #ffffff10; color: #d3e8df; font-size: 11px; font-weight: 700; cursor: pointer; transition: all .15s; }
-.boss-squad-btn.active { background: #0284c7; border-color: #38bdf8; color: #ffffff; font-weight: 800; box-shadow: 0 0 10px #38bdf866; }
-.boss-squad-preview { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; margin: 2px 0 6px; }
-.boss-squad-member-chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 12px; background: #0d3846; border: 1px solid #1e586d; font-size: 10px; font-weight: 700; color: #e2f3e9; }
-.boss-squad-warning { color: #f87171; font-size: 11px; font-weight: 700; margin: 2px 0; }
-.boss-squad-success { color: #4ade80; font-size: 11px; font-weight: 700; margin: 2px 0; }
-.boss-rotate-hint { flex-shrink: 0; margin: 0; color: #a8c8c5; font-size: 9px; text-align: center; }
-@media (orientation: portrait) { .boss-landscape { inset: auto; top: 0; left: 100%; width: 100dvh; height: 100vw; transform: rotate(90deg); transform-origin: top left; } }
-@media (max-height: 420px) { .boss-hud { min-height: 32px; } .boss-intro-card { gap: 5px; } .boss-intro h1 { font-size: 20px; } .boss-rotate-hint { display: none; } }
-@media (prefers-reduced-motion: reduce) { .boss-health i { transition: none; } }
+/* ==========================================================================
+   Escape The Island - Raid Boss Encounter & War Room Lobby Stylesheet
+   Theme: Vintage Tropical Nautical Adventure & High-Fidelity Arcade Arena
+   ========================================================================== */
+
+:root {
+  --boss-lagoon-deep: #051915;
+  --boss-lagoon-surface: #0a2922;
+  --boss-lagoon-border: #164e40;
+  --boss-gold-bright: #fbbf24;
+  --boss-gold-dark: #b45309;
+  --boss-gold-shadow: #78350f;
+  --boss-parchment: #fdfaf2;
+  --boss-parchment-muted: #e7dfcb;
+  --boss-wood-border: #3b2716;
+  --boss-emerald: #10b981;
+  --boss-emerald-glow: rgba(16, 185, 129, 0.35);
+  --boss-crimson: #ef4444;
+  --boss-purple: #c084fc;
+}
+
+.boss-screen {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 20%, #0d3830 0%, #061e19 60%, #03100d 100%);
+  color: var(--boss-parchment);
+  font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
+  user-select: none;
+}
+
+.boss-landscape {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: max(8px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+}
+
+/* ==========================================================================
+   Top HUD Bar (Tactical Arcade Status)
+   ========================================================================== */
+
+.boss-hud {
+  display: flex;
+  min-height: 48px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: clamp(8px, 2vw, 18px);
+  padding: 6px 14px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(12, 43, 35, 0.94) 0%, rgba(6, 26, 21, 0.96) 100%);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.boss-back {
+  display: inline-flex;
+  min-width: 44px;
+  min-height: 38px;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #fef08a;
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+  letter-spacing: 0.02em;
+  transition: all 0.15s ease;
+}
+
+.boss-back:hover {
+  background: rgba(251, 191, 36, 0.18);
+  border-color: rgba(251, 191, 36, 0.4);
+  transform: translateY(-1px);
+}
+
+.boss-health {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  max-width: 220px;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #e2f3e9;
+  letter-spacing: 0.04em;
+}
+
+.boss-health > div {
+  height: 12px;
+  flex: 1;
+  overflow: hidden;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6);
+  padding: 1px;
+}
+
+.boss-health i {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #10b981 0%, #34d399 70%, #6ee7b7 100%);
+  box-shadow: 0 0 8px rgba(52, 211, 153, 0.6);
+  transition: width 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.boss-health b {
+  min-width: 28px;
+  font-variant-numeric: tabular-nums;
+  color: #6ee7b7;
+  font-size: 13px;
+}
+
+.boss-squad-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 9999px;
+  background: linear-gradient(180deg, rgba(14, 53, 44, 0.9) 0%, rgba(6, 29, 24, 0.9) 100%);
+  border: 1px solid rgba(56, 189, 248, 0.6);
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.25);
+  color: #38bdf8;
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.boss-timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  color: #fef08a;
+  font-size: 12px;
+  font-weight: 850;
+  font-variant-numeric: tabular-nums;
+}
+
+.boss-name-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.boss-phase-tag {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid currentColor;
+}
+
+.boss-hud-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.boss-sound-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  border-radius: 8px;
+  background: linear-gradient(180deg, #184c3e 0%, #0c2d24 100%);
+  color: #fde68a;
+  cursor: pointer;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+  transition: all 0.15s ease;
+}
+
+.boss-sound-btn:hover {
+  background: linear-gradient(180deg, #205c4c 0%, #123d32 100%);
+  border-color: rgba(251, 191, 36, 0.6);
+  transform: translateY(-1px);
+}
+
+.boss-sound-btn:active {
+  transform: scale(0.94);
+}
+
+.boss-powerup-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  animation: pulsePowerup 1.2s infinite alternate;
+}
+
+.boss-powerup-badge.spread {
+  background: rgba(245, 158, 11, 0.25);
+  border: 1px solid #f59e0b;
+  color: #fef3c7;
+}
+
+.boss-powerup-badge.shield {
+  background: rgba(59, 130, 246, 0.25);
+  border: 1px solid #60a5fa;
+  color: #dbeafe;
+}
+
+.boss-powerup-badge.speed {
+  background: rgba(16, 185, 129, 0.25);
+  border: 1px solid #34d399;
+  color: #d1fae5;
+}
+
+.boss-powerup-badge.heal {
+  background: rgba(244, 63, 94, 0.25);
+  border: 1px solid #f43f5e;
+  color: #ffe4e6;
+}
+
+@keyframes pulsePowerup {
+  0% { transform: scale(1); opacity: 0.9; }
+  100% { transform: scale(1.04); opacity: 1; }
+}
+
+/* ==========================================================================
+   Playfield & Combat Canvas
+   ========================================================================== */
+
+.boss-playfield {
+  position: relative;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+  border-radius: 16px;
+  background: radial-gradient(circle at 50% 30%, #115764 0%, #0a3a44 60%, #06242c 100%);
+  border: 2px solid rgba(251, 191, 36, 0.4);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), inset 0 0 40px rgba(0, 0, 0, 0.4);
+}
+
+.boss-playfield canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* ==========================================================================
+   Tactical Raid War Room Lobby (Pre-encounter & Results)
+   ========================================================================== */
+
+.boss-intro {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow-y: auto;
+  padding: clamp(10px, 3vh, 24px);
+  background: radial-gradient(circle at 50% 30%, rgba(8, 38, 30, 0.96) 0%, rgba(4, 19, 15, 0.98) 100%);
+  backdrop-filter: blur(8px);
+  z-index: 50;
+}
+
+.boss-intro-card {
+  display: grid;
+  width: min(100%, 780px);
+  gap: 12px;
+  padding: clamp(14px, 3vh, 24px);
+  text-align: center;
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(16, 54, 43, 0.92) 0%, rgba(9, 32, 25, 0.96) 100%);
+  border: 2px solid rgba(251, 191, 36, 0.45);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.boss-kicker {
+  display: inline-block;
+  color: #fbbf24;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* Boss Navigation Tabs in Lobby */
+.boss-opponents-picker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 4px 0 8px;
+}
+
+.boss-opponent-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #e2f3e9;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.boss-opponent-tab:hover {
+  background: rgba(251, 191, 36, 0.15);
+  border-color: rgba(251, 191, 36, 0.4);
+  transform: translateY(-1px);
+}
+
+.boss-opponent-tab.active {
+  background: linear-gradient(180deg, #1d6150 0%, #103c31 100%);
+  border-color: #fbbf24;
+  color: #fffbeb;
+  box-shadow: 0 0 14px rgba(251, 191, 36, 0.35);
+}
+
+.boss-opponent-tab small {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.3);
+  color: #fde68a;
+}
+
+.boss-intro h1 {
+  color: #fffdf5;
+  font-size: clamp(22px, 4.5vh, 32px);
+  font-weight: 900;
+  line-height: 1.15;
+  margin: 0;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.boss-intro p {
+  max-width: 620px;
+  margin: 0 auto;
+  color: #d1fae5;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.boss-intro p.boss-small {
+  color: #a7f3d0;
+  font-size: 11px;
+}
+
+/* Tactical Dashboard Panel (HP scaling, Target Duration, Shield Warning) */
+.boss-tactical-dashboard {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.boss-tactical-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: center;
+}
+
+.boss-tactical-stat label {
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.boss-tactical-stat span {
+  color: #fef08a;
+  font-size: 14px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Squad Configuration & Roster */
+.boss-squad-config {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(6, 26, 20, 0.65);
+  border: 1px solid rgba(251, 191, 36, 0.25);
+}
+
+.boss-squad-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.boss-squad-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #fef08a;
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.boss-squad-selector {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.boss-squad-btn {
+  padding: 5px 11px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.07);
+  color: #e2f3e9;
+  font-size: 11px;
+  font-weight: 750;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.boss-squad-btn:hover {
+  background: rgba(251, 191, 36, 0.15);
+  border-color: rgba(251, 191, 36, 0.4);
+  color: #fff;
+}
+
+.boss-squad-btn.active {
+  background: linear-gradient(180deg, #0284c7 0%, #0369a1 100%);
+  border-color: #38bdf8;
+  color: #ffffff;
+  font-weight: 850;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.45);
+}
+
+/* Swimmer Roster Cards Grid */
+.boss-roster-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(135px, 1fr));
+  gap: 8px;
+  max-height: 190px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.boss-roster-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 6px;
+  border-radius: 10px;
+  background: rgba(15, 49, 39, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transition: all 0.15s ease;
+}
+
+.boss-roster-card.is-you {
+  background: linear-gradient(180deg, rgba(29, 90, 72, 0.9) 0%, rgba(14, 48, 38, 0.9) 100%);
+  border-color: rgba(251, 191, 36, 0.5);
+  box-shadow: 0 0 10px rgba(251, 191, 36, 0.2);
+}
+
+.boss-roster-avatar-box {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.4);
+  border: 2px solid currentColor;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+
+.boss-roster-name {
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 850;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.boss-roster-role {
+  color: #93c5fd;
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.boss-roster-weapon {
+  color: #fde68a;
+  font-size: 8.5px;
+  font-weight: 600;
+}
+
+.boss-squad-warning {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(248, 113, 113, 0.5);
+  color: #fca5a5;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.boss-squad-success {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(16, 185, 129, 0.2);
+  border: 1px solid rgba(52, 211, 153, 0.5);
+  color: #86efac;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+/* Post-battle Summary Results */
+.boss-results {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 8px;
+  margin: 6px 0;
+}
+
+.boss-results > div {
+  display: grid;
+  gap: 3px;
+  padding: 10px 6px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(251, 191, 36, 0.25);
+}
+
+.boss-results strong {
+  color: #fde68a;
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 900;
+}
+
+.boss-results span {
+  color: #d1fae5;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* Epic 3D Start Button */
+.boss-start {
+  min-width: 220px;
+  min-height: 48px;
+  padding: 12px 28px;
+  border: 0;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #f59e0b 0%, #d97706 70%, #b45309 100%);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: 0 4px 0 #78350f, 0 8px 20px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  transition: all 0.15s ease;
+  margin: 4px auto;
+}
+
+.boss-start:hover:not(:disabled) {
+  background: linear-gradient(180deg, #fbbf24 0%, #f59e0b 70%, #d97706 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 #78350f, 0 12px 24px rgba(0, 0, 0, 0.5);
+}
+
+.boss-start:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #78350f, 0 3px 10px rgba(0, 0, 0, 0.4);
+}
+
+.boss-start:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  filter: grayscale(0.5);
+}
+
+.boss-exit {
+  display: inline-block;
+  min-height: 32px;
+  color: #fef08a;
+  font-size: 12px;
+  font-weight: 750;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  transition: opacity 0.15s ease;
+}
+
+.boss-exit:hover {
+  opacity: 0.8;
+}
+
+.boss-intro p.boss-error {
+  color: #fca5a5;
+  font-weight: 700;
+}
+
+/* ==========================================================================
+   Virtual Arcade Controls (Joystick, Attack, Dash)
+   ========================================================================== */
+
+.boss-controls {
+  position: absolute;
+  right: clamp(14px, 4vw, 42px);
+  bottom: 14px;
+  left: clamp(14px, 4vw, 42px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.boss-actions-cluster {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  pointer-events: auto;
+}
+
+.boss-joystick,
+.boss-attack,
+.boss-dash {
+  touch-action: none;
+  user-select: none;
+  pointer-events: auto;
+}
+
+.boss-joystick {
+  position: relative;
+  display: grid;
+  width: clamp(82px, 17vh, 114px);
+  aspect-ratio: 1;
+  place-items: center;
+  border: 3px solid rgba(251, 191, 36, 0.6);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(14, 53, 44, 0.85) 0%, rgba(6, 26, 21, 0.95) 100%);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6), inset 0 2px 6px rgba(255, 255, 255, 0.15);
+  cursor: grab;
+}
+
+.boss-joystick:active {
+  cursor: grabbing;
+}
+
+.boss-joystick span {
+  display: block;
+  width: 44%;
+  aspect-ratio: 1;
+  border: 2px solid #fffdf5;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fde68a 0%, #f59e0b 60%, #b45309 100%);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5), inset 0 1px 3px rgba(255, 255, 255, 0.8);
+  pointer-events: none;
+}
+
+.boss-dash {
+  display: grid;
+  width: clamp(58px, 12vh, 76px);
+  aspect-ratio: 1;
+  place-items: center;
+  border: 2px solid #93c5fd;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 70%, #1e3a8a 100%);
+  box-shadow: 0 4px 0 #172554, 0 6px 14px rgba(0, 0, 0, 0.4);
+  color: #eff6ff;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.boss-dash:active {
+  transform: translateY(3px) scale(0.96);
+  box-shadow: 0 1px 0 #172554;
+}
+
+.boss-dash:disabled {
+  opacity: 0.45;
+  filter: grayscale(0.6);
+  cursor: not-allowed;
+}
+
+.boss-attack {
+  display: grid;
+  width: clamp(76px, 15vh, 102px);
+  aspect-ratio: 1;
+  place-items: center;
+  border: 3px solid #fef08a;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #ea580c 0%, #c2410c 70%, #9a3412 100%);
+  box-shadow: 0 5px 0 #7c2d12, 0 8px 18px rgba(0, 0, 0, 0.5);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 950;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.boss-attack:active {
+  transform: translateY(4px) scale(0.96);
+  box-shadow: 0 1px 0 #7c2d12;
+  background: linear-gradient(180deg, #f97316 0%, #ea580c 100%);
+}
+
+.boss-rotate-hint {
+  flex-shrink: 0;
+  margin: 0;
+  color: #a7f3d0;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+  opacity: 0.85;
+}
+
+/* ==========================================================================
+   Responsive Orientation & Mobile Layout
+   ========================================================================== */
+
+@media (orientation: portrait) {
+  .boss-landscape {
+    inset: auto;
+    top: 0;
+    left: 100%;
+    width: 100dvh;
+    height: 100vw;
+    transform: rotate(90deg);
+    transform-origin: top left;
+  }
+}
+
+@media (max-height: 480px) {
+  .boss-hud {
+    min-height: 32px;
+    padding: 2px 8px;
+    gap: 6px;
+  }
+  .boss-intro {
+    padding: 2px;
+    place-items: center;
+  }
+  .boss-intro-card {
+    gap: 3px;
+    padding: 6px 12px;
+    max-height: 365px;
+    overflow-y: auto;
+  }
+  .boss-kicker {
+    font-size: 8.5px;
+  }
+  .boss-opponents-picker {
+    margin: 1px 0;
+    gap: 4px;
+  }
+  .boss-opponent-tab {
+    padding: 2px 7px;
+    font-size: 10px;
+  }
+  .boss-intro h1 {
+    font-size: 15px;
+    margin: 0;
+  }
+  .boss-intro p {
+    font-size: 10px;
+    margin: 0;
+    line-height: 1.15;
+  }
+  .boss-tactical-dashboard {
+    padding: 3px 6px;
+    gap: 4px;
+  }
+  .boss-tactical-stat label {
+    font-size: 7.5px;
+  }
+  .boss-tactical-stat span {
+    font-size: 10px;
+  }
+  .boss-squad-config {
+    padding: 3px 6px;
+    gap: 2px;
+  }
+  .boss-squad-header {
+    margin-bottom: 1px;
+  }
+  .boss-squad-btn {
+    padding: 2px 5px;
+    font-size: 9.5px;
+  }
+  .boss-roster-grid {
+    display: flex;
+    gap: 3px;
+    max-height: 44px;
+    overflow-x: auto;
+  }
+  .boss-roster-card {
+    padding: 1px 4px;
+    min-width: 58px;
+    gap: 1px;
+  }
+  .boss-roster-avatar-box {
+    width: 16px;
+    height: 16px;
+    font-size: 10px;
+  }
+  .boss-roster-name {
+    font-size: 8.5px;
+  }
+  .boss-roster-role,
+  .boss-roster-weapon {
+    display: none;
+  }
+  .boss-squad-warning,
+  .boss-squad-success {
+    padding: 2px 6px;
+    font-size: 9.5px;
+    margin-top: 1px;
+  }
+  .boss-intro p.boss-small {
+    display: none;
+  }
+  .boss-start {
+    padding: 5px 14px;
+    font-size: 12px;
+    min-height: 32px;
+  }
+  .boss-exit {
+    font-size: 9.5px;
+    margin-top: 1px;
+  }
+  .boss-rotate-hint {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .boss-health i {
+    transition: none;
+  }
+  .boss-powerup-badge {
+    animation: none;
+  }
+}
+
+/* Island palette and a compact room lobby. */
+.boss-screen { background: #07545b; color: #e8f4df; }
+.boss-hud { background: #07545b; border-color: #a1cca6; box-shadow: 0 4px 12px #06383c55; }
+.boss-playfield { border-color: #a1cca6; }
+.boss-intro { place-items: start center; background: #07545b; backdrop-filter: none; }
+.boss-intro-card { align-self: start; max-width: 610px; max-height: 100%; gap: 10px; overflow-y: auto; text-align: left; background: #dff0dc; color: #103d41; border: 0; border-radius: 16px; box-shadow: 0 8px 24px #05383e55; }
+.boss-kicker { color: #07545b; letter-spacing: .04em; }
+.boss-opponents-picker { justify-content: flex-start; margin: 0; }
+.boss-opponent-tab { min-height: 40px; background: #bfe5cf; color: #103d41; border-color: #80bca5; }
+.boss-opponent-tab small { background: #dff0dc; color: #07545b; }
+.boss-opponent-tab.active { background: #07545b; color: #fff; border-color: #07545b; box-shadow: none; }
+.boss-opponent-tab.active small { background: #f9d779; color: #103d41; }
+.boss-intro h1 { color: #103d41; text-shadow: none; }
+.boss-intro p, .boss-intro p.boss-small { max-width: none; margin: 0; color: #285456; }
+.boss-intro p.boss-error { color: #812f22; }
+.boss-brief { display: flex; flex-wrap: wrap; gap: 8px; }
+.boss-brief span { display: inline-flex; align-items: center; gap: 6px; padding: 6px 9px; border-radius: 8px; background: #f9d779; color: #103d41; font-size: 12px; font-weight: 750; }
+.raid-lobby { display: grid; gap: 8px; padding: 12px; border-radius: 12px; background: #bfe5cf; }
+.raid-lobby-heading { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: #103d41; }
+.raid-lobby-heading strong { display: flex; align-items: center; gap: 6px; }
+.raid-lobby-players { display: flex; flex-wrap: wrap; gap: 8px; }
+.raid-lobby-player { display: flex; align-items: center; gap: 6px; padding: 4px 8px 4px 4px; border-radius: 9px; background: #dff0dc; color: #103d41; font-size: 12px; font-weight: 700; }
+.raid-leave { justify-self: start; min-height: 36px; border: 0; background: transparent; color: #07545b; font-weight: 750; text-decoration: underline; }
+.raid-join, .boss-start { display: flex; min-height: 44px; align-items: center; justify-content: center; gap: 8px; border: 1px solid #765a20; border-radius: 12px; background: #f9d779; color: #103d41; font-size: 14px; font-weight: 800; box-shadow: none; }
+.raid-join { background: #bfe5cf; border-color: #07545b; }
+.raid-join:disabled, .boss-start:disabled { opacity: .55; }
+.boss-exit { color: #07545b; }
+.boss-dialogue { position: absolute; z-index: 60; inset: 0; display: grid; grid-template-rows: minmax(100px, 1fr) auto; background: #23ced9; }
+.boss-dialogue-art { display: grid; place-items: end center; min-height: 0; background: #23ced9; }
+.boss-playfield .boss-dialogue-art canvas { width: auto; height: min(100%, 150px); aspect-ratio: 120 / 130; object-fit: contain; }
+.boss-dialogue-box { display: grid; gap: 7px; padding: 15px 22px; border-top: 1px solid #f9d779; background: #07545b; color: #fff; }
+.boss-dialogue-box strong { color: #f9d779; font-size: 14px; letter-spacing: .06em; }
+.boss-dialogue-box p { margin: 0; color: #fff; font-size: 16px; font-weight: 700; line-height: 1.4; }
+.boss-dialogue-box button { display: inline-flex; align-items: center; gap: 6px; justify-self: end; min-height: 40px; padding: 6px 14px; border: 0; border-radius: 8px; background: #f9d779; color: #103d41; font-weight: 800; }
+.boss-aim { position: relative; display: grid; width: clamp(58px, 12vh, 80px); aspect-ratio: 1; place-items: center; touch-action: none; pointer-events: auto; border: 2px solid #f9d779; border-radius: 50%; background: #07545bd9; color: #fff; }
+.boss-aim > span { width: 42%; aspect-ratio: 1; border: 2px solid #07545b; border-radius: 50%; background: #23ced9; }
+.boss-aim small { position: absolute; bottom: 4px; font-size: 9px; font-weight: 800; }
+.boss-joystick { background: #07545bd9; border-color: #f9d779; }
+.boss-joystick span { background: #f9d779; border-color: #07545b; }
+.boss-dash { background: #097c87; border-color: #a1cca6; box-shadow: 0 3px 0 #07545b; }
+.boss-attack { background: #f9d779; border-color: #765a20; color: #103d41; box-shadow: 0 4px 0 #a17a2d; }
+.raid-connection { position: absolute; top: 8px; left: 8px; z-index: 30; padding: 8px; border-radius: 8px; background: #fca47c; color: #422819; font-size: 12px; }
+@media (max-height: 480px) { .boss-intro-card { max-height: 100%; gap: 8px; padding: 12px; } .boss-intro h1 { font-size: 20px; } .boss-intro p { font-size: 12px; line-height: 1.35; } .boss-dialogue-box { padding: 8px 14px; } .boss-dialogue-box p { font-size: 14px; } .boss-actions-cluster { gap: 7px; } }

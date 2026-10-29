@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Check, ChevronLeft, Compass, Download, Flame, Settings2, Swords, UserRound, UsersRound, WifiOff, X } from "lucide-react";
-import { useEffect, useRef, type MouseEvent, type ReactNode } from "react";
+import { Check, Compass, Flame, Settings2, UsersRound, WifiOff, X } from "lucide-react";
+import { useEffect, useRef, useSyncExternalStore, type MouseEvent, type ReactNode } from "react";
 import { useGame } from "./game-provider";
+import Onboarding from "./onboarding";
 
 const tabs = [
   { href: "/", label: "Escape", icon: Compass },
@@ -13,10 +14,32 @@ const tabs = [
   { href: "/settings", label: "Settings", icon: Settings2 },
 ];
 
+const onboardingKey = "escape-onboarding-v1";
+const onboardingChangeEvent = "escape-onboarding-change";
+
+function subscribeToOnboarding(callback: () => void) {
+  window.addEventListener("storage", callback);
+  window.addEventListener(onboardingChangeEvent, callback);
+  return () => {
+    window.removeEventListener("storage", callback);
+    window.removeEventListener(onboardingChangeEvent, callback);
+  };
+}
+
+function getOnboardingSnapshot() {
+  try { return localStorage.getItem(onboardingKey) === "done"; }
+  catch { return false; }
+}
+
+function getOnboardingServerSnapshot() {
+  return null;
+}
+
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const game = useGame();
+  const onboardingDone = useSyncExternalStore(subscribeToOnboarding, getOnboardingSnapshot, getOnboardingServerSnapshot);
   const { notice, setNotice } = game;
   const main = useRef<HTMLElement>(null);
   const mapPage = pathname === "/";
@@ -41,14 +64,18 @@ export default function AppShell({ children }: { children: ReactNode }) {
     location.assign(destination.href);
   }
 
+  function finishOnboarding(destination: string) {
+    try { localStorage.setItem(onboardingKey, "done"); } catch { /* Continue for this session. */ }
+    window.dispatchEvent(new Event(onboardingChangeEvent));
+    router.push(destination);
+  }
+
+  if (pathname.startsWith("/boss")) return <>{children}</>;
+  if (onboardingDone === null || (!onboardingDone && !game.ready)) return <div className="app-shell onboarding-loading" aria-label="Loading" />;
+  if (!onboardingDone) return <div className="app-shell"><Onboarding onFinish={finishOnboarding} /></div>;
+
   return <div className="app-shell" onClickCapture={navigateOffline}>
     <a className="skip-link" href="#page-content">Skip to content</a>
-    {!mapPage && <header className="app-header">
-      <Link className="back-link" href="/" aria-label="Back to escape route"><ChevronLeft size={21}/><span>Your island</span></Link>
-      <div className="header-actions">
-        <Link href="/account" className="icon-button account-button" aria-label="Open account"><UserRound size={20}/></Link>
-      </div>
-    </header>}
     {!game.online && <div className="connection-banner" role="status"><WifiOff size={14}/> Offline. Online check-ins need a connection.</div>}
     <main ref={main} id="page-content" className={`page-main${mapPage ? " is-map" : ""}`} tabIndex={-1}>{children}</main>
     <nav className="app-tabbar" aria-label="Main navigation">{tabs.map(({ href, label, icon: Icon }) => {

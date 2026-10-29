@@ -13,7 +13,6 @@ import {
   Diamond,
   Flag,
   Flame,
-  Footprints,
   Lock,
   LocateFixed,
   MailOpen,
@@ -60,11 +59,9 @@ export default function EscapeScreen() {
   const crew = game.mode === "online" && game.room.id ? game.players : [];
   const selectedPlayer = crew.find(player => player.id === selectedPlayerId);
 
-  const groups = new Map<number, typeof crew>();
-  for (const player of crew.filter(player => !player.self)) {
-    const progress = Math.max(0, Math.min(30, player.progress));
-    groups.set(progress, [...(groups.get(progress) || []), player]);
-  }
+  // Players with no check-ins are waiting at the first checkpoint, not on day 1 yet.
+  const crewAtDay = (day: number) => crew.filter(player => Math.max(1, Math.min(30, player.progress)) === day);
+  const selectedCrew = crewAtDay(selectedDay);
 
   // Calculate 7-day streak calendar (Mon - Sun) inspired by reference image
   const todayDate = new Date(`${game.day}T00:00:00Z`);
@@ -82,7 +79,6 @@ export default function EscapeScreen() {
     return { dateStr, dayLabel, isLogged, isCurrent, isPast };
   });
 
-  const xpEarned = completed * 100 + game.streak * 25;
   const escapePercent = Math.min(100, Math.round((completed / 30) * 100));
 
   function scrollToDay(day: number, smooth = true) {
@@ -146,43 +142,12 @@ export default function EscapeScreen() {
 
   return (
     <section className={`escape-screen${celebrating ? " celebrating" : ""}`} aria-labelledby="escape-title">
-      {/* GAMIFIED TOP HUD HEADER (Matching reference image) */}
       <div className="game-hud-header">
-        <div className="hud-level-badge" title={`Escape Progress: ${completed} of 30 days`}>
-          <div className="hud-shield-icon">
-            <span className="hud-shield-num">{completed}</span>
-          </div>
-          <div className="hud-level-info">
-            <span className="hud-level-pct">{escapePercent}%</span>
-            <div className="hud-progress-track">
-              <div className="hud-progress-fill" style={{ transform: `scaleX(${Math.max(0.06, escapePercent / 100)})` }} />
-            </div>
-          </div>
-        </div>
-
         <div className="hud-title-banner">
-          <h1 id="escape-title" className="hud-main-title">
-            THE ESCAPE
-          </h1>
-          <span className="hud-subtitle">
-            {game.mode === "online" ? game.room.name : "Practice Island"}
-          </span>
+          <h1 id="escape-title" className="hud-main-title">The Escape</h1>
+          <span className="hud-subtitle">{game.mode === "online" ? game.room.name : "Solo practice"}</span>
         </div>
-
         <div className="hud-resources">
-          {/* XP Pill */}
-          <div className="hud-resource-pill xp-pill" title={`${xpEarned} Escape XP`}>
-            <Zap size={14} className="xp-bolt" />
-            <span>{xpEarned}</span>
-          </div>
-
-          {/* Daily Streak Pill */}
-          <Link href="/streak" className="hud-resource-pill streak-pill" title={`${game.streak} Day Streak`}>
-            <Flame size={15} className="streak-flame" />
-            <span>{game.streak}</span>
-          </Link>
-
-          {/* Quick Avatar Studio Button */}
           <button
             className="hud-avatar-btn"
             onClick={() => router.push("/settings#avatar")}
@@ -193,11 +158,15 @@ export default function EscapeScreen() {
             <span className="hud-edit-dot"><Wand2 size={9} /></span>
           </button>
 
-          {/* Account Profile Button */}
           <Link href="/account" className="hud-account-btn" aria-label="Account profile" title="Account profile">
             <UserRound size={16} />
           </Link>
         </div>
+        <button className="hud-route-progress" onClick={locate} aria-label={`Escape progress: ${completed} of 30 days. Find your checkpoint`}>
+          <span className="hud-progress-label">Escape progress <strong>{completed} <span>/ 30 days</span></strong></span>
+          <span className="hud-progress-track" aria-hidden="true"><span className="hud-progress-fill" style={{ transform: `scaleX(${escapePercent / 100})` }} /></span>
+          <LocateFixed size={17} aria-hidden="true" />
+        </button>
       </div>
 
       {/* FLOATING 7-DAYS STREAK RIBBON (From reference image) */}
@@ -229,6 +198,13 @@ export default function EscapeScreen() {
       </div>
 
       {/* CREW EXPEDITION BAR (If online room active) */}
+      {game.ready && (game.mode === "practice" || (game.mode === "online" && !game.room.id)) && (
+        <Link className="crew-map-empty" href="/crew">
+          <Users size={15} aria-hidden="true" />
+          <span>{game.mode === "practice" ? "Practice is solo · Bring your crew" : "Join or create a room to see your crew"}</span>
+          <span aria-hidden="true">›</span>
+        </Link>
+      )}
       {crew.length > 0 && (
         <div className="crew-map-bar">
           <div className="crew-map-heading">
@@ -346,6 +322,7 @@ export default function EscapeScreen() {
               const isSelected = day === selectedDay && !selectedPlayer && !rewardSelected;
               const isMilestone = day === 1 || day % 5 === 0;
               const isHarbor = day === 30;
+              const checkpointCrew = crewAtDay(day).filter(player => !player.self);
 
               return (
                 <button
@@ -354,7 +331,7 @@ export default function EscapeScreen() {
                     isSelected ? "is-selected" : ""
                   } ${isMilestone ? "is-milestone" : ""} ${isHarbor ? "is-harbor" : ""}`}
                   style={{ left: `${point.x / 10}%`, top: `${(point.y / ROUTE_HEIGHT) * 100}%` }}
-                  aria-label={`Day ${day}: ${landmarkForDay(day).name}, ${done ? "completed" : current ? "today" : "locked"}`}
+                  aria-label={`Day ${day}: ${landmarkForDay(day).name}, ${done ? "completed" : current ? "today" : "locked"}${checkpointCrew.length ? `, ${checkpointCrew.length} crew ${checkpointCrew.length === 1 ? "member" : "members"} here` : ""}`}
                   aria-pressed={isSelected}
                   onClick={() => {
                     setSelectedPlayerId(null);
@@ -416,6 +393,16 @@ export default function EscapeScreen() {
                   <span className="checkpoint-3d-face">
                     <span className="checkpoint-num">{day}</span>
                   </span>
+                  {checkpointCrew.length > 0 && (
+                    <span className="checkpoint-crew-stack" aria-hidden="true">
+                      {checkpointCrew.slice(0, 3).map(player => (
+                        <span className={`checkpoint-crew-avatar${!player.alive && !player.won ? " is-out" : ""}`} key={player.id}>
+                          <PlayerAvatar avatarId={player.avatarId} accent={player.avatarAccent} size={23} animated={false} />
+                        </span>
+                      ))}
+                      {checkpointCrew.length > 3 && <span className="checkpoint-crew-more">+{checkpointCrew.length - 3}</span>}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -483,29 +470,6 @@ export default function EscapeScreen() {
               {rewardUnlocked && <span className="chest-sparkle-halo" aria-hidden="true" />}
             </button>
 
-            {/* OTHER CREW MEMBERS ON THE MAP */}
-            {[...groups.entries()].map(([progress, members]) => {
-              const point = routePoint(progress);
-              const member = members.find(player => player.id === selectedPlayerId) || members[0];
-              const anyAlive = members.some(player => player.alive || player.won);
-              return (
-                <button
-                  key={members[0].id}
-                  className={`map-crew-marker${
-                    members.some(player => player.id === selectedPlayerId) ? " is-selected" : ""
-                  }${anyAlive ? " has-survivors" : " all-out"}`}
-                  style={{ left: `${point.x / 10}%`, top: `${(point.y / ROUTE_HEIGHT) * 100}%` }}
-                  aria-label={`${members.length > 1 ? `${members.length} players` : member.name} at ${progress} of 30 days`}
-                  onClick={() => selectPlayer(member.id)}
-                >
-                  <span className="map-crew-avatar">
-                    <PlayerAvatar avatarId={member.avatarId} accent={member.avatarAccent} size={36} animated={false} />
-                  </span>
-                  {members.length > 1 && <span className="map-crew-count">+{members.length - 1}</span>}
-                </button>
-              );
-            })}
-
             {/* CELEBRATION CONFETTI & PARTICLES */}
             {celebrating && (
               <div
@@ -540,15 +504,17 @@ export default function EscapeScreen() {
       {!detailsOpen ? (
         <div className={`bottom-game-dock ${questsOpen ? "quests-expanded" : "quests-collapsed"}`}>
           {/* Header of the Quests Card */}
-          <div className="dock-quests-header" onClick={() => setQuestsOpen(!questsOpen)}>
+          <div className="dock-quests-header">
             <div className="dock-title-row">
               <span className="gem-icon-badge"><Diamond size={15} aria-hidden="true" /></span>
-              <span className="dock-title-text">TODAY&apos;S ESCAPE QUESTS</span>
+              <span className="dock-title-text">TODAY&apos;S ESCAPE QUEST</span>
             </div>
             <div className="dock-header-actions">
               <button
                 className="dock-toggle-btn"
                 aria-label={questsOpen ? "Collapse quests" : "Expand quests"}
+                aria-expanded={questsOpen}
+                onClick={() => setQuestsOpen(!questsOpen)}
               >
                 {questsOpen ? <X size={16} /> : <ChevronUp size={16} />}
               </button>
@@ -564,49 +530,14 @@ export default function EscapeScreen() {
                   <span className="quest-gem"><Diamond size={18} aria-hidden="true" /></span>
                 </div>
                 <div className="quest-info">
-                  <strong className="quest-title">Log Today&apos;s Check-in</strong>
-                  <span className="quest-sub">Escape Epstein before midnight</span>
+                  <strong className="quest-title">{game.checked ? "Today's check-in saved" : !game.me.alive ? "Your run has ended" : game.me.won || (game.mode === "online" && game.seasonFinished) ? "The challenge has ended" : game.mode === "online" && game.isPregame ? "Get ready for November" : "Log today's check-in"}</strong>
+                  <span className="quest-sub">{game.checked ? "Come back tomorrow for your next step." : !game.me.alive ? "You can still cheer on your crew." : game.me.won || (game.mode === "online" && game.seasonFinished) ? "Visit your crew to see the results." : game.mode === "online" && game.isPregame ? "Daily check-ins start November 1." : "Check in honestly before midnight to advance one day."}</span>
                 </div>
                 <div className="quest-reward">
-                  <span className="quest-xp">+100 XP</span>
-                  <span className="quest-streak"><Flame size={12} aria-hidden="true" /> +1 Day</span>
+                  <span className="quest-xp">{game.checked ? "DONE" : "DAILY"}</span>
                 </div>
               </div>
 
-              {/* Quest 2 */}
-              <div className="quest-card">
-                <div className="quest-gem-icon">
-                  <span className="quest-gem"><Footprints size={18} aria-hidden="true" /></span>
-                </div>
-                <div className="quest-info">
-                  <strong className="quest-title">Stay 2 Days Ahead</strong>
-                  <span className="quest-sub">Epstein is 2 days behind you</span>
-                </div>
-                <div className="quest-reward">
-                  <span className="quest-xp">+50 XP</span>
-                  <span className="quest-streak">Safe</span>
-                </div>
-              </div>
-
-              {/* Quest 3: 3-Boss Contra Raids */}
-              <div
-                className="quest-card boss-quest-card"
-                onClick={() => router.push("/boss?opponent=kirkify")}
-                style={{ cursor: "pointer" }}
-                title="Open the solo Kirkify encounter"
-              >
-                <div className="quest-gem-icon boss-gem-icon">
-                  <Swords size={17} className="boss-swords-icon" />
-                </div>
-                <div className="quest-info">
-                  <strong className="quest-title">Face Kirkify</strong>
-                  <span className="quest-sub">Solo practice · Dodge and attack for 3 minutes</span>
-                </div>
-                <div className="quest-reward">
-                  <span className="quest-xp">PLAY</span>
-                  <span className="quest-streak">3:00</span>
-                </div>
-              </div>
             </div>
           )}
 
@@ -624,9 +555,9 @@ export default function EscapeScreen() {
               <Link className="dock-primary-cta game-btn-3d danger" href="/crew">
                 <Trophy size={18} /> Visit your crew
               </Link>
-            ) : game.me.won ? (
+            ) : game.me.won || (game.mode === "online" && game.seasonFinished) ? (
               <Link className="dock-primary-cta game-btn-3d gold" href="/crew">
-                <Trophy size={18} /> You Escaped! Celebrate
+                <Trophy size={18} /> {game.me.won ? "You Escaped! Celebrate" : "View crew results"}
               </Link>
             ) : game.checked ? (
               <Link className="dock-primary-cta game-btn-3d success" href="/streak">
@@ -772,11 +703,33 @@ export default function EscapeScreen() {
               : selected.description}
           </p>
 
+          {game.ready && (
+            <div className="checkpoint-crew-details">
+              <h3>Crew at this checkpoint</h3>
+              {game.mode === "practice" ? (
+                <p>Practice is solo. <Link href="/crew">Set up or join a crew</Link> to see friends on the map.</p>
+              ) : !game.room.id ? (
+                <p>You&apos;re not in a room yet. <Link href="/crew">Create or join a room</Link> to see your crew here.</p>
+              ) : selectedCrew.length ? (
+                <ul>
+                  {selectedCrew.map(player => (
+                    <li key={player.id}>
+                      <PlayerAvatar avatarId={player.avatarId} accent={player.avatarAccent} size={30} animated={false} />
+                      <span><strong>{player.self ? "You" : player.name}</strong><small>{player.won ? "Escaped" : !player.alive ? "Out of the run" : player.progress === 0 ? "Still in · Waiting at the start" : player.checkedIn ? "Still in · Checked in today" : "Still in · Check-in pending"}</small></span>
+                    </li>
+                  ))}
+                </ul>
+              ) : <p>No crew members at this checkpoint yet. <Link href="/crew">View your crew</Link></p>}
+            </div>
+          )}
+
           <div className="detail-actions-row">
             {!game.me.alive || game.me.won || (game.seasonFinished && game.mode === "online") ? (
               <Link className="primary-button game-btn-3d" href="/crew">
                 <Trophy size={18} /> {game.me.won ? "Celebrate With Crew" : "Visit Crew"}
               </Link>
+            ) : game.mode === "online" && game.isPregame ? (
+              <Link className="primary-button game-btn-3d" href="/crew"><Flag size={18} /> Gather Your Crew</Link>
             ) : selectedFuture || (selectedDone && !game.checked) ? (
               <button className="primary-button game-btn-3d" onClick={() => { setSelection(null); locate(); }}>
                 <LocateFixed size={18} /> Back to Today&apos;s Step

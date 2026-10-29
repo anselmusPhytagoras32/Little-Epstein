@@ -1,4 +1,5 @@
 import type { AvatarAccent, AvatarId } from "../lib/avatars";
+import { useId } from "react";
 import { useGame } from "./game-provider";
 
 const portraits: Record<AvatarId, string> = {
@@ -17,9 +18,13 @@ export function PlayerAvatar({ avatarId, accent, size, animated = false }: { ava
   const game = useGame();
   const selected = avatarId ?? game.me.avatarId;
   const color = accent ?? game.me.avatarAccent ?? "sea";
+  const clipId = useId();
+  const portrait = portraits[selected] || portraits.fern;
+  const [x, y, width, height] = portrait.split(" ").map(Number);
   return <span className={`player-avatar avatar-${selected} accent-${color}${animated ? " avatar-animated" : ""}`} style={size ? { width: size, height: size } : undefined} aria-hidden="true">
-    <svg className="avatar-sprite" viewBox={portraits[selected] || portraits.fern} focusable="false">
-      <image href="/images/Pixel-Art%20Base%20Avatar%20Selection%20Sheet.png" width="1448" height="1086" />
+    <svg className="avatar-sprite" viewBox={portrait} focusable="false">
+      <defs><clipPath id={clipId}><rect x={x} y={y} width={width} height={height} /></clipPath></defs>
+      <image href="/images/Pixel-Art%20Base%20Avatar%20Selection%20Sheet.png" width="1448" height="1086" clipPath={`url(#${clipId})`} />
     </svg>
   </span>;
 }

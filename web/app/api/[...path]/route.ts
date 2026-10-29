@@ -5,6 +5,7 @@ import type { PushSubscription as BrowserSubscription } from "web-push";
 import { consecutiveStreak, GAME_END, GAME_START, localDateKey, inviteToken, ROOM_LIMIT } from "../../../lib/game-rules";
 import { database } from "../../../lib/database";
 import { isAvatarAccent, isAvatarId } from "../../../lib/avatars";
+import { bossHealthFloor, getScaledBossHp, TARGET_RAID_DURATION_SECONDS } from "../../boss/boss-rules";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,7 +40,13 @@ async function body(request: NextRequest) {
 
 function assertSameOrigin(request: NextRequest) {
   const origin = request.headers.get("origin");
-  if (origin && new URL(origin).origin !== new URL(request.url).origin) throw new RequestError("Refresh the page and try again.", 403);
+  if (origin) {
+    const source = new URL(origin), destination = new URL(request.url);
+    // Next can normalize 127.0.0.1 to localhost internally. Still require
+    // the browser's exact Host and protocol when accepting a loopback origin.
+    const localHost = (source.hostname === "127.0.0.1" || source.hostname === "localhost") && source.host === request.headers.get("host") && source.protocol === destination.protocol;
+    if (source.origin !== destination.origin && !localHost) throw new RequestError("Refresh the page and try again.", 403);
+  }
   if (request.headers.get("sec-fetch-site") === "cross-site") throw new RequestError("Refresh the page and try again.", 403);
   if (request.headers.get("content-type")?.split(";")[0].trim() !== "application/json") throw new RequestError("Send this form again from the game.", 415);
 }
@@ -93,6 +100,88 @@ async function loadRoom(playerId: string, selectedRoomId: string | null = null) 
       const dates=checkins.rows.filter((entry)=>entry.room_id===item.id&&entry.player_id===item.player_id).map((entry)=>entry.game_date);
       return { id:item.player_id,username:item.username,avatarId:item.avatar_id,avatarAccent:item.avatar_accent,status:item.status,checkedIn:item.checked_in,self:item.self,eliminated_on:item.self?item.eliminated_on:null,progress:dates.filter((date)=>date>=GAME_START&&date<=GAME_END).length,streak:consecutiveStreak(dates,today>GAME_END?GAME_END:item.checked_in?today:yesterday) };
     }) };
+}
+
+async function bossRoomAccess(roomId: string, playerId: string) {
+  if (!idForm.test(roomId)) throw new RequestError("Choose a valid crew room.", 400);
+  const membership = await database().query(`SELECT 1 FROM room_members WHERE room_id=$1 AND player_id=$2`, [roomId, playerId]);
+  if (!membership.rowCount) throw new RequestError("Join this crew before entering its boss lobby.", 403);
+}
+
+async function bossSnapshot(roomId: string, playerId: string) {
+  const raid = await database().query<{host_id:string; opponent:string; phase:string; hp:number; max_hp:number; boss_x:number; boss_y:number; started_at:Date|null}>(`SELECT host_id, opponent, phase, hp, max_hp, boss_x, boss_y, started_at FROM boss_raids WHERE room_id=$1`, [roomId]);
+  if (!raid.rowCount) return null;
+  const members = await database().query<{id:string;name:string;avatar_id:string;avatar_accent:string;x:number;y:number;alive:boolean;damage_total:number;self:boolean}>(
+    `SELECT p.id,p.username AS name,p.avatar_id,p.avatar_accent,b.x,b.y,b.alive,b.damage_total,(p.id=$2) AS self
+     FROM boss_raid_players b JOIN players p ON p.id=b.player_id
+     WHERE b.room_id=$1 AND b.last_seen > now()-interval '20 seconds' ORDER BY b.joined_at,p.id`, [roomId, playerId]);
+  const row = raid.rows[0];
+  return { opponent:row.opponent, phase:row.phase, hp:row.hp, maxHp:row.max_hp, bossX:row.boss_x, bossY:row.boss_y, startedAt:row.started_at, host:row.host_id===playerId, players:members.rows.map(p => ({id:p.id,name:p.name,avatarId:p.avatar_id,avatarAccent:p.avatar_accent,x:p.x,y:p.y,alive:p.alive,damageTotal:p.self?p.damage_total:undefined,self:p.self})) };
+}
+
+async function bossAction(roomId: string, user: AuthedPlayer, data: Record<string, unknown>) {
+  await bossRoomAccess(roomId, user.id);
+  const operation = data.operation;
+  if (!["join", "start", "heartbeat", "leave"].includes(String(operation))) throw new RequestError("Choose a lobby action.", 400);
+  const client = await database().connect();
+  try {
+    await client.query("BEGIN");
+    if (operation === "join") {
+      const opponent = data.opponent;
+      if (opponent !== "kirkify" && opponent !== "diddy" && opponent !== "epstein") throw new RequestError("Choose a boss.", 400);
+      await client.query(`DELETE FROM boss_raids WHERE room_id=$1 AND (updated_at < now()-interval '30 minutes' OR (updated_at < now()-interval '20 seconds' AND NOT EXISTS (SELECT 1 FROM boss_raid_players WHERE room_id=$1 AND last_seen > now()-interval '20 seconds')))`, [roomId]);
+      await client.query(`INSERT INTO boss_raids(room_id,host_id,opponent) VALUES($1,$2,$3) ON CONFLICT(room_id) DO NOTHING`, [roomId, user.id, opponent]);
+    }
+    const locked = await client.query<{host_id:string;opponent:string;phase:string;hp:number;max_hp:number;started_at:Date|null}>(`SELECT host_id,opponent,phase,hp,max_hp,started_at FROM boss_raids WHERE room_id=$1 FOR UPDATE`, [roomId]);
+    if (!locked.rowCount) throw new RequestError("The lobby has closed. Create a new one.", 404);
+    const raid = locked.rows[0];
+    if (operation === "join") {
+      if (raid.phase !== "waiting") throw new RequestError(raid.phase === "won" ? "Your crew is finishing the last raid. Try again shortly." : "This fight has already started. Join the next lobby.", 409);
+      if (raid.opponent !== data.opponent) throw new RequestError("Your crew already has a lobby for another boss.", 409);
+      await client.query(`INSERT INTO boss_raid_players(room_id,player_id) VALUES($1,$2) ON CONFLICT(room_id,player_id) DO UPDATE SET last_seen=now()`, [roomId, user.id]);
+    } else {
+      const member = await client.query<{damage_total:number;last_seen:Date;alive:boolean}>(`SELECT damage_total,last_seen,alive FROM boss_raid_players WHERE room_id=$1 AND player_id=$2`, [roomId, user.id]);
+      if (!member.rowCount) throw new RequestError("Join the lobby first.", 403);
+      if (operation === "heartbeat" && raid.phase !== "won" && raid.host_id !== user.id) {
+        const host = await client.query(`SELECT 1 FROM boss_raid_players WHERE room_id=$1 AND player_id=$2 AND alive=true AND last_seen > now()-interval '20 seconds'`, [roomId, raid.host_id]);
+        if (!host.rowCount) await client.query(`UPDATE boss_raids SET host_id=$2 WHERE room_id=$1`, [roomId, user.id]);
+      }
+      if (operation === "start") {
+        if (raid.host_id !== user.id || raid.phase !== "waiting") throw new RequestError("Only the lobby host can start the fight.", 403);
+        const count = await client.query<{count:string}>(`SELECT count(*) FROM boss_raid_players WHERE room_id=$1 AND last_seen > now()-interval '20 seconds'`, [roomId]);
+        const hp = getScaledBossHp(raid.opponent, Number(count.rows[0].count));
+        await client.query(`DELETE FROM boss_raid_players WHERE room_id=$1 AND last_seen <= now()-interval '20 seconds'`, [roomId]);
+        await client.query(`UPDATE boss_raids SET phase='playing',hp=$2,max_hp=$2,started_at=now() WHERE room_id=$1`, [roomId, hp]);
+      } else if (operation === "leave") {
+        await client.query(`DELETE FROM boss_raid_players WHERE room_id=$1 AND player_id=$2`, [roomId, user.id]);
+        if (raid.phase === "waiting" && raid.host_id === user.id) {
+          const next = await client.query<{player_id:string}>(`SELECT player_id FROM boss_raid_players WHERE room_id=$1 ORDER BY joined_at LIMIT 1`, [roomId]);
+          if (next.rowCount) await client.query(`UPDATE boss_raids SET host_id=$2 WHERE room_id=$1`, [roomId, next.rows[0].player_id]);
+          else await client.query(`DELETE FROM boss_raids WHERE room_id=$1`, [roomId]);
+        }
+        if (raid.phase !== "waiting") await client.query(`DELETE FROM boss_raids WHERE room_id=$1 AND NOT EXISTS (SELECT 1 FROM boss_raid_players WHERE room_id=$1)`, [roomId]);
+      } else {
+        const finite = (value:unknown, min:number, max:number, fallback:number) => typeof value === "number" && Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback;
+        const oldTotal = member.rows[0].damage_total;
+        const reported = Math.floor(finite(data.damageTotal, oldTotal, 10_000_000, oldTotal));
+        const elapsed = Math.max(0, (Date.now() - new Date(member.rows[0].last_seen).getTime()) / 1000);
+        const accepted = member.rows[0].alive ? Math.min(reported - oldTotal, Math.ceil(250 * Math.min(10, elapsed + 1))) : 0;
+        const alive = member.rows[0].alive && data.alive !== false;
+        await client.query(`UPDATE boss_raid_players SET x=$3,y=$4,alive=$5,damage_total=$6,last_seen=now() WHERE room_id=$1 AND player_id=$2`, [roomId,user.id,finite(data.x,0,960,480),finite(data.y,0,540,440),alive,oldTotal + accepted]);
+        if (raid.phase === "playing" && raid.host_id === user.id && alive) await client.query(`UPDATE boss_raids SET boss_x=$2,boss_y=$3 WHERE room_id=$1`, [roomId,finite(data.bossX,0,960,480),finite(data.bossY,0,540,130)]);
+        if (raid.phase === "playing" && raid.started_at && accepted > 0) {
+          const seconds = Math.max(0, (Date.now() - new Date(raid.started_at).getTime()) / 1000);
+          const floor = bossHealthFloor(raid.max_hp, seconds, TARGET_RAID_DURATION_SECONDS[raid.opponent]);
+          const hp = Math.max(floor, raid.hp - accepted);
+          await client.query(`UPDATE boss_raids SET hp=$2,phase=CASE WHEN $2=0 THEN 'won' ELSE phase END WHERE room_id=$1`, [roomId, hp]);
+        }
+      }
+    }
+    await client.query(`UPDATE boss_raids SET updated_at=now() WHERE room_id=$1`, [roomId]);
+    await client.query("COMMIT");
+  } catch (error) { await client.query("ROLLBACK"); throw error; }
+  finally { client.release(); }
+  return bossSnapshot(roomId, user.id);
 }
 
 async function register(data: Record<string, unknown>) {
@@ -155,6 +244,11 @@ export async function POST(request:NextRequest,{params}:{params:Promise<{path:st
   try { assertSameOrigin(request);const {path}=await params;const action=path.join("/");
     if(action==="auth"){const data=await body(request);if(data.action==="logout"){const token=request.cookies.get(COOKIE)?.value;if(token)await database().query(`DELETE FROM sessions WHERE token_hash=$1`,[hash(token)]);const out=json({ok:true});out.headers.append("Set-Cookie",cookieValue("",0));return out;}if(data.action==="register")return await register(data);if(data.action==="login")return await signIn(request,data);return fail("Choose sign in or create an account.");}
     const user=await authed(request);
+    if(action==="boss/lobby"){
+      const data=await body(request);
+      const roomId=typeof data.roomId==="string"?data.roomId:"";
+      return json({lobby:await bossAction(roomId,user,data)});
+    }
     if(action==="rooms"){
       const data=await body(request);
       const roomName=typeof data.name==="string"?data.name.trim():"";

@@ -1,4 +1,4 @@
-const VERSION = "escape-pwa-v17";
+const VERSION = "escape-pwa-v18";
 const APP_CACHE = `${VERSION}-pages`;
 const ASSET_CACHE = `${VERSION}-assets`;
 const CORE_PAGES = [
@@ -127,6 +127,14 @@ self.addEventListener("fetch", event => {
   if (url.pathname.startsWith("/_next/static/") || PUBLIC_ASSETS.includes(url.pathname) || url.pathname.startsWith("/icons/") || url.pathname.startsWith("/images/")) {
     event.respondWith((async () => {
       const cache = await caches.open(ASSET_CACHE);
+      // Development can reuse framework URLs; prefer fresh styles and scripts.
+      if (url.pathname.startsWith("/_next/static/")) {
+        try {
+          const response = await fetch(new Request(request, { credentials: "omit" }));
+          if (response.ok) { await cache.put(request, response.clone()).catch(() => {}); return response; }
+          return await cache.match(request) || response;
+        } catch { return await cache.match(request) || Response.error(); }
+      }
       const cached = await cache.match(request);
       if (cached) return cached;
       const response = await fetch(new Request(request, { credentials: "omit" }));

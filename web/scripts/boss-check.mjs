@@ -109,26 +109,34 @@ try {
     const originalArc = CanvasRenderingContext2D.prototype.arc;
     CanvasRenderingContext2D.prototype.arc = function(...args) { if(args[2]===5) observed.shots++; if(args[2]===11) observed.hazards++; return originalArc.apply(this,args); };
   })();` });
-  const { bossStage } = await import(new URL("../app/boss/boss-rules.ts", import.meta.url));
+  const { bossStage, bossHealthFloor, getScaledBossHp, TARGET_RAID_DURATION_SECONDS } = await import(new URL("../app/boss/boss-rules.ts", import.meta.url));
   for (const [hp, expected] of [[2700, "human"], [1801, "human"], [1800, "transformed"], [901, "transformed"], [900, "enraged"], [1, "enraged"], [0, "defeated"]]) {
     verify(bossStage(hp) === expected, `Health ${hp} maps to the ${expected} phase`);
+  }
+  for (const [boss, seconds] of [["kirkify", 300], ["diddy", 600], ["epstein", 900]]) {
+    const hp = getScaledBossHp(boss, 1);
+    verify(getScaledBossHp(boss, 3) === hp * 3, `${boss} health scales with the actual player count`);
+    verify(TARGET_RAID_DURATION_SECONDS[boss] === seconds && bossHealthFloor(hp, seconds - 1, seconds) > 0 && bossHealthFloor(hp, seconds, seconds) === 0, `${boss} cannot be defeated before its minimum duration`);
   }
 
   for (const [id, name, sprite] of [["kirkify", "Kirkify", "Kirk Sprite"], ["diddy", "Diddy", "Diddy Sprite"], ["epstein", "Epstein", "Epstein Sprite"]]) {
     await page.send("Page.navigate", { url: new URL(`/boss?opponent=${id}`, app).href });
     await waitFor(`document.readyState === 'complete' && document.querySelector('.boss-intro h1')?.textContent === ${JSON.stringify(`Face ${name}`)} && !!document.querySelector('.boss-start') && !document.querySelector('.boss-start').disabled`, `${name} and both sprite sheets`);
-    verify(await evaluate("document.querySelector('.boss-squad-badge')?.textContent.includes('3 SWIMMERS')"), `${name} encounter displays 3-swimmer squad badge without countdown timer`);
+    verify(await evaluate("document.querySelector('.boss-squad-badge')?.textContent.includes('1 SWIMMER')"), `${name} encounter starts as solo practice`);
     verify(await evaluate("!document.querySelector('.boss-health.enemy') && !/boss (health|damage)|boss hp/i.test(document.querySelector('.boss-hud').textContent)"), `${name} boss health is hidden in the HUD`);
     verify(await evaluate("document.querySelector('.boss-screen').dataset.bossPhase === 'human'"), `${name} starts in human phase`);
     if (id === "kirkify") await capture("boss-ready.png");
     await click(".boss-start");
+    await waitFor("!!document.querySelector('.boss-dialogue button')", `${name} dialogue`);
+    await click(".boss-dialogue button");
     await waitFor(`!!document.querySelector('.boss-joystick') && !!document.querySelector('.boss-attack') && [...window.__bossCheck.sources].some(src => src.includes(${JSON.stringify(sprite)})) && window.__bossCheck.drawnAvatar > 0`, `${name} and the player sprites are drawn`);
     verify(await evaluate(`Array.from(window.__bossCheck.sources).some(src => src.includes(${JSON.stringify(sprite)}))`), `${name}'s actual sprite is rendered`);
     verify(await evaluate("!document.querySelector('.boss-health.enemy') && !/boss (health|damage)|boss hp/i.test(document.querySelector('.boss-hud').textContent)"), `${name} boss health remains hidden during play`);
 
     if (id !== "kirkify") continue;
     const squadBadgeText = await evaluate("document.querySelector('.boss-squad-badge')?.textContent");
-    verify(squadBadgeText?.includes("3 SWIMMERS"), "The squad badge confirms 3 active swimmers");
+    verify(squadBadgeText?.includes("1 SWIMMER"), "The squad badge confirms solo practice");
+    verify(await evaluate("!!document.querySelector('.boss-aim')"), "The aim control is available");
     const initialX = await evaluate("window.__bossCheck.playerX");
     const stick = await rect(".boss-joystick");
     await press(stick.x, stick.y);
@@ -155,12 +163,15 @@ try {
     // Real attacks still have to collide to cross it; no production test hook is added.
     const found = await evaluate(`(() => {const canvas=document.querySelector('canvas');const key=Object.keys(canvas).find(k=>k.startsWith('__reactFiber'));let fiber=key&&canvas[key];while(fiber){let hook=fiber.memoizedState;while(hook){const ref=hook.memoizedState;if(ref?.current&&typeof ref.current.bossHp==='number'&&Array.isArray(ref.current.shots)){window.__battleFixture=ref.current;return true}hook=hook.next}fiber=fiber.return}return false})()`);
     verify(found, "The isolated test can set up damage thresholds without a production hook");
-    verify(await evaluate("window.__battleFixture.squadCount >= 3 && window.__battleFixture.companions.length >= 2"), "At least 3 persons are active in the raid squad");
+    verify(await evaluate("window.__battleFixture.squadCount === 1"), "Solo practice does not invent teammates");
+    await page.send("Input.dispatchKeyEvent", { type: "keyDown", key: "j", code: "KeyJ" });
+    await page.send("Input.dispatchKeyEvent", { type: "keyDown", key: " ", code: "Space" });
+    await waitFor("window.__battleFixture.shots.some(shot => shot.vx < -500)", "aimed shots travel left");
+    await page.send("Input.dispatchKeyEvent", { type: "keyUp", key: "j", code: "KeyJ" });
+    await page.send("Input.dispatchKeyEvent", { type: "keyUp", key: " ", code: "Space" });
     for (const [hp, expected] of [[1804, "transformed"], [904, "enraged"], [4, "defeated"]]) {
-      const landed = await evaluate(`(() => {const battle=window.__battleFixture;battle.bossHp=${hp};battle.hp=100;battle.invulnerable=30;return battle.shotsLanded})()`);
-      await press(attack.x, attack.y);
+      const landed = await evaluate(`(() => {const battle=window.__battleFixture;battle.maxBossHp=2700;battle.bossHp=${hp};battle.battleTimer=901;battle.hp=100;battle.invulnerable=30;battle.shots.push({x:battle.bossX,y:battle.bossY,vx:0,vy:0,damage:10});return battle.shotsLanded})()`);
       await waitFor(`document.querySelector('.boss-screen').dataset.bossPhase === ${JSON.stringify(expected)}`, `real attacks reach ${expected} phase`, 15000);
-      await release(attack.x, attack.y);
       verify(await evaluate(`window.__battleFixture.shotsLanded > ${landed}`), `An actual projectile lands to trigger ${expected}`);
       verify(await evaluate("!document.querySelector('.boss-health.enemy') && !/boss (health|damage)|boss hp/i.test(document.querySelector('.boss-hud').textContent)"), `Health stays hidden in ${expected} phase`);
     }
@@ -168,13 +179,15 @@ try {
     verify(await evaluate("!/boss (health|damage)|boss hp/i.test(document.querySelector('.boss-results').textContent)"), "The results do not reveal the boss's remaining health or damage percentage");
     await capture("boss-results.png");
     await click(".boss-start");
+    await waitFor("!!document.querySelector('.boss-dialogue button')", "retry dialogue");
+    await click(".boss-dialogue button");
     await waitFor("!!document.querySelector('.boss-joystick') && !document.querySelector('.boss-results')", "a new encounter after retry");
-    verify(await evaluate("document.querySelector('.boss-squad-badge')?.textContent.includes('3 SWIMMERS') && document.querySelector('.boss-health b').textContent === '100' && document.querySelector('.boss-screen').dataset.bossPhase === 'human'"), "Retry resets squad counter, player health, and boss phase");
+    verify(await evaluate("document.querySelector('.boss-squad-badge')?.textContent.includes('1 SWIMMER') && document.querySelector('.boss-health b').textContent === '100' && document.querySelector('.boss-screen').dataset.bossPhase === 'human'"), "Retry resets squad counter, player health, and boss phase");
   }
   await click(".boss-back");
   await waitFor("location.pathname === '/' && !document.querySelector('.boss-screen')", "leaving the encounter");
   verify(exceptions.length === 0, `Browser runtime exceptions: ${exceptions.join('\n')}`);
-  console.log(JSON.stringify({ result: "passed", assertions, screenshots: ["boss-ready.png", "boss-playing.png", "boss-portrait.png", "boss-results.png"], note: "Uses isolated local practice and deterministic near-threshold state; does not test live multiplayer or a full three-minute fight." }, null, 2));
+  console.log(JSON.stringify({ result: "passed", assertions, screenshots: ["boss-ready.png", "boss-playing.png", "boss-portrait.png", "boss-results.png"], note: "Uses isolated local practice and deterministic near-threshold state; does not test live multiplayer or full-length fights." }, null, 2));
 } catch (error) {
   if (page) { try { await capture("boss-failure.png"); } catch { /* Preserve original failure. */ } }
   console.error(`BOSS CHECK FAILED: ${error.message}`);

@@ -8,7 +8,7 @@ Local practice has one player and stays on the current device. Practice check-in
 
 Avatar character and accent choices are saved on this device in practice and to the player profile online, where room members can see them on the map. After updating an existing Neon deployment, run `corepack pnpm@10.30.3 db:migrate` before using online accounts; Render runs this migration during pre-deploy.
 
-The `/boss` page hosts three-minute solo practice encounters with Kirkify, Diddy, and Epstein. Use the on-screen joystick and hold Attack, or use WASD/arrow keys and Space. The encounters do not change the daily run or synchronize other players.
+The `/boss` page offers solo practice and private crew raids against Kirkify, Diddy, and Epstein. Signed-in members of the same room can join a lobby; the host starts the encounter and participants share boss health and see each other's positions. Boss health scales with the number of players present at the start. An endurance shield prevents a knockout before 5, 10, or 15 minutes respectively. Use the move and aim controls on touch (aiming also fires), or WASD/arrow keys to move, IJKL to aim, Space to fire, and Shift to dash. Raids do not change the daily run. Online lobbies require the database migration and a connection; enemy hazards are simulated locally on each device.
 
 ## Run locally
 
@@ -67,6 +67,9 @@ Without VAPID keys, check-ins and scheduled elimination still work. A saved remi
 | `corepack pnpm@10.30.3 start` | Serve the production build. |
 | `corepack pnpm@10.30.3 lint` | Check application code with ESLint. |
 | `corepack pnpm@10.30.3 ui:check` | Check routed screens, controls, persistence, and phone layouts in an isolated Chrome context. |
+| `node scripts/onboarding-check.mjs` | Check first-visit progress, solo/crew choice, and deferring account creation in an isolated Chrome context. |
+| `node scripts/boss-check.mjs` | Check boss controls, phase transitions, and layouts with an isolated Chrome context. |
+| `node scripts/boss-lobby-check.mjs` | Exercise membership, health scaling, shared state, and host handoff against an isolated local database and app. Set `BOSS_TEST_DATABASE_URL` and `APP_URL` to loopback addresses. |
 | `corepack pnpm@10.30.3 exec tsc --noEmit` | Check TypeScript types. |
 | `corepack pnpm@10.30.3 db:migrate` | Apply the Neon schema. |
 | `corepack pnpm@10.30.3 sweep` | Process missed days, winners, and opted-in reminders. |

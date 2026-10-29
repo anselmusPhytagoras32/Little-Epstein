@@ -10,5 +10,5 @@ export default async function BossPage({
   const opp = resolved?.opponent;
   const validOpponent =
     opp === "diddy" || opp === "epstein" ? opp : "kirkify";
-  return <BossEncounter initialOpponent={validOpponent} />;
+  return <BossEncounter key={validOpponent} initialOpponent={validOpponent} />;
 }

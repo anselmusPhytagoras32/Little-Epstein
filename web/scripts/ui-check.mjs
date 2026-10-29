@@ -82,7 +82,7 @@ async function waitFor(expression, label, timeout = 10_000) {
 
 async function navigate(route, selector = ".screen h1") {
   await page.send("Page.navigate", { url: new URL(route, app).href });
-  await waitFor(`location.pathname === ${JSON.stringify(route.split("?")[0])} && document.readyState === 'complete' && !!document.querySelector(${JSON.stringify(selector)}) && getComputedStyle(document.querySelector('.app-shell')).display === 'flex' && getComputedStyle(document.querySelector('.app-header')).display === 'flex'`, `${route} document and styles finish loading`);
+  await waitFor(`location.pathname === ${JSON.stringify(route.split("?")[0])} && document.readyState === 'complete' && !!document.querySelector(${JSON.stringify(selector)}) && getComputedStyle(document.querySelector('.app-shell')).display === 'flex'`, `${route} document and styles finish loading`);
   await waitFor("!document.querySelector('.loading-surface')", `${route} finishes loading`);
   verify(!await evaluate("!!document.querySelector('[role=dialog]')"), `${route} must be a full page, not a modal`);
 }

@@ -4,43 +4,71 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { useGame } from "../game-provider";
 import type { AvatarId } from "../../lib/avatars";
-import { bossStage, MAX_BOSS_HP, type BossStage } from "./boss-rules";
+import {
+  bossStage,
+  bossHealthFloor,
+  TARGET_RAID_DURATION_SECONDS,
+  getScaledBossHp,
+  type BossStage,
+} from "./boss-rules";
 import { contraAudio } from "../../lib/contra-audio";
-import { Volume2, VolumeX, Shield, Zap, Sparkles, Users } from "lucide-react";
+import { lobbyRequest, type BossLobby } from "./lobby";
+import { PlayerAvatar } from "../avatar";
+import {
+  Volume2,
+  VolumeX,
+  Shield,
+  Zap,
+  Sparkles,
+  Users,
+  Heart,
+  Timer,
+  Swords,
+} from "lucide-react";
 
 const W = 960;
 const H = 540;
 type Phase = "ready" | "playing" | "won" | "lost";
 type Opponent = "kirkify" | "diddy" | "epstein";
 
-export interface Companion {
-  id: string;
-  name: string;
-  avatarId: AvatarId;
-  accent: string;
-  offsetX: number;
-  offsetY: number;
-  shootTimer: number;
-}
-
-const opponents: Record<Opponent, { name: string; image: string; accent: string; title: string }> = {
+const opponents: Record<
+  Opponent,
+  {
+    name: string;
+    image: string;
+    accent: string;
+    title: string;
+    day: number;
+    targetMinutes: number;
+    description: string;
+  }
+> = {
   kirkify: {
     name: "Kirkify",
     image: "/images/Kirk%20Sprite%20Sheet.png",
-    accent: "#c477f2",
+    accent: "#f9d779",
     title: "Coastal Enforcer",
+    day: 10,
+    targetMinutes: 5,
+    description: "Coastal enforcer commanding ricochet coconut clusters, sweeping void claws, and demonic phase transformations.",
   },
   diddy: {
     name: "Diddy",
     image: "/images/Diddy%20Sprite%20Sheet.png",
-    accent: "#f77885",
+    accent: "#fca47c",
     title: "Island Horror Overseer",
+    day: 20,
+    targetMinutes: 10,
+    description: "Horrific conch overseer firing tracking laser beams, razor whirlpools, and corrupted island projectiles.",
   },
   epstein: {
     name: "Epstein",
     image: "/images/Epstein%20Sprite%20Sheet.png",
-    accent: "#ff925e",
+    accent: "#23ced9",
     title: "Island Overlord",
+    day: 30,
+    targetMinutes: 15,
+    description: "Ultimate eldritch overlord unleashing tentacle eruptions, mouth death beams, and apocalyptic blood-moon barrage.",
   },
 };
 
@@ -50,10 +78,26 @@ type Projectile = {
   vx: number;
   vy: number;
   radius: number;
-  kind?: "wave" | "orb" | "pillar" | "tentacle" | "slash";
+  color?: string;
 };
-type Shot = { x: number; y: number; vx: number; vy: number };
-type WarningZone = { x: number; y: number; radius: number; time: number; maxTime: number; type: "rush" | "pillar" | "tentacle" };
+
+type Shot = {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  color?: string;
+  damage?: number;
+};
+
+type WarningZone = {
+  x: number;
+  y: number;
+  radius: number;
+  time: number;
+  maxTime: number;
+  type: "rush" | "pillar" | "tentacle";
+};
 
 type Particle = {
   x: number;
@@ -77,7 +121,7 @@ type FloatingText = {
   size: number;
 };
 
-type PowerupType = "spread" | "shield" | "speed";
+type PowerupType = "spread" | "shield" | "speed" | "heal";
 type Powerup = {
   id: number;
   x: number;
@@ -106,9 +150,12 @@ type PhaseBanner = {
 
 type Battle = {
   squadCount: number;
-  companions: Companion[];
   hp: number;
+  maxHp: number;
   bossHp: number;
+  maxBossHp: number;
+  battleTimer: number;
+  shieldHits: number;
   x: number;
   y: number;
   bossX: number;
@@ -151,36 +198,18 @@ type Battle = {
   isTransforming: boolean;
 };
 
-function fresh(squadCount: number = 3): Battle {
-  const companions: Companion[] = [];
-  if (squadCount >= 2) {
-    companions.push({
-      id: "kai",
-      name: "Kai",
-      avatarId: "sky",
-      accent: "#38bdf8",
-      offsetX: -46,
-      offsetY: 14,
-      shootTimer: 0.35,
-    });
-  }
-  if (squadCount >= 3) {
-    companions.push({
-      id: "maya",
-      name: "Maya",
-      avatarId: "coral",
-      accent: "#f43f5e",
-      offsetX: 46,
-      offsetY: 14,
-      shootTimer: 0.55,
-    });
-  }
+function fresh(squadCount: number = 1, opp: Opponent = "kirkify"): Battle {
+
+  const scaledHp = getScaledBossHp(opp, squadCount);
 
   return {
     squadCount,
-    companions,
     hp: 100,
-    bossHp: MAX_BOSS_HP,
+    maxHp: 100,
+    bossHp: scaledHp,
+    maxBossHp: scaledHp,
+    battleTimer: 0,
+    shieldHits: 0,
     x: W / 2,
     y: H - 100,
     bossX: W / 2,
@@ -195,13 +224,13 @@ function fresh(squadCount: number = 3): Battle {
     banner: null,
     laser: null,
     cooldown: 0,
-    spawn: 1.2,
-    rushClock: 8,
+    spawn: 1.1,
+    rushClock: 8.5,
     rushTime: 0,
     rushX: 0,
     rushY: 0,
-    laserClock: 9,
-    powerupSpawnTimer: 10,
+    laserClock: 9.5,
+    powerupSpawnTimer: 8,
     spiralAngle: 0,
     dashTimer: 0,
     dashCooldown: 0,
@@ -249,6 +278,67 @@ interface BossSpriteSheetMap {
   defeated: Frame[];
 }
 
+// Some supplied frames include a dark matte. Remove only dark pixels connected
+// to the frame edge, preserving dark details enclosed inside the character.
+const cleanedFrames = new WeakMap<HTMLImageElement, Map<string, HTMLCanvasElement>>();
+function cleanBossFrame(image: HTMLImageElement, frame: Frame): HTMLCanvasElement {
+  let frames = cleanedFrames.get(image);
+  if (!frames) { frames = new Map(); cleanedFrames.set(image, frames); }
+  const key = frame.join(",");
+  const existing = frames.get(key);
+  if (existing) return existing;
+  const [x, y, width, height] = frame;
+  const canvas = document.createElement("canvas");
+  canvas.width = width; canvas.height = height;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return canvas;
+  ctx.drawImage(image, x, y, width, height, 0, 0, width, height);
+  const pixels = ctx.getImageData(0, 0, width, height);
+  const visited = new Uint8Array(width * height);
+  const queue = new Int32Array(width * height);
+  let head = 0, tail = 0;
+  function enqueue(index: number) {
+    if (visited[index]) return;
+    visited[index] = 1;
+    const p = index * 4;
+    if (pixels.data[p + 3] === 0 || (pixels.data[p] < 55 && pixels.data[p + 1] < 55 && pixels.data[p + 2] < 70)) queue[tail++] = index;
+  }
+  for (let column = 0; column < width; column++) { enqueue(column); enqueue((height - 1) * width + column); }
+  for (let row = 0; row < height; row++) { enqueue(row * width); enqueue(row * width + width - 1); }
+  while (head < tail) {
+    const index = queue[head++], column = index % width, row = Math.floor(index / width);
+    pixels.data[index * 4 + 3] = 0;
+    if (column > 0) enqueue(index - 1);
+    if (column + 1 < width) enqueue(index + 1);
+    if (row > 0) enqueue(index - width);
+    if (row + 1 < height) enqueue(index + width);
+  }
+  ctx.putImageData(pixels, 0, 0);
+  frames.set(key, canvas);
+  return canvas;
+}
+
+function DialoguePortrait({ opponent }: { opponent: Opponent }) {
+  const target = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const ctx = target.current?.getContext("2d");
+    if (!ctx) return;
+    let cancelled = false;
+    const image = new Image();
+    image.onload = () => {
+      if (cancelled) return;
+      const cleaned = cleanBossFrame(image, SPRITE_MAPS[opponent].humanIdle[0]);
+      const scale = Math.min(110 / cleaned.width, 120 / cleaned.height);
+      ctx.imageSmoothingEnabled = false;
+      ctx.clearRect(0, 0, 120, 130);
+      ctx.drawImage(cleaned, (120 - cleaned.width * scale) / 2, 130 - cleaned.height * scale, cleaned.width * scale, cleaned.height * scale);
+    };
+    image.src = opponents[opponent].image;
+    return () => { cancelled = true; };
+  }, [opponent]);
+  return <canvas ref={target} width={120} height={130} aria-hidden="true" />;
+}
+
 const SPRITE_MAPS: Record<Opponent, BossSpriteSheetMap> = {
   kirkify: {
     humanIdle: [
@@ -289,26 +379,26 @@ const SPRITE_MAPS: Record<Opponent, BossSpriteSheetMap> = {
       [1020, 470, 500, 200],
     ],
     phase2Idle: [
-      [16, 700, 274, 140],
-      [290, 704, 220, 131],
-      [510, 704, 205, 127],
+      [16, 726, 274, 114],
+      [290, 715, 220, 120],
+      [510, 715, 205, 116],
       [717, 722, 212, 111],
     ],
     phase2Attack: [
-      [16, 700, 274, 140],
-      [290, 704, 220, 131],
-      [510, 704, 205, 127],
+      [16, 726, 274, 114],
+      [290, 715, 220, 120],
+      [510, 715, 205, 116],
     ],
     phase2Enraged: [
-      [12, 845, 143, 147],
-      [155, 845, 145, 148],
-      [300, 845, 115, 148],
-      [415, 845, 185, 150],
+      [12, 855, 143, 137],
+      [155, 855, 145, 138],
+      [300, 855, 115, 138],
+      [415, 855, 185, 140],
     ],
     defeated: [
-      [600, 845, 150, 150],
-      [750, 845, 180, 143],
-      [930, 845, 220, 150],
+      [600, 868, 145, 125],
+      [750, 868, 180, 120],
+      [930, 868, 220, 125],
     ],
   },
   diddy: {
@@ -446,9 +536,19 @@ export default function BossEncounter({
   const game = useGame();
   const canvas = useRef<HTMLCanvasElement>(null);
   const joystick = useRef<HTMLButtonElement>(null);
-  const images = useRef<{ boss?: HTMLImageElement; avatar?: HTMLImageElement }>({});
-  const battle = useRef<Battle>(fresh());
-  const controls = useRef({ x: 0, y: 0, attack: false, keys: new Set<string>() });
+  const images = useRef<{ boss?: HTMLImageElement; avatar?: HTMLImageElement; island?: HTMLImageElement }>({});
+  const battle = useRef<Battle>(fresh(1, initialOpponent));
+  const controls = useRef({ x: 0, y: 0, aimX: 0, aimY: -1, attack: false, keys: new Set<string>() });
+  const aimJoystick = useRef<HTMLButtonElement>(null);
+  const aimPointer = useRef<number | null>(null);
+  const lobbyRef = useRef<BossLobby | null>(null);
+  const raidDamage = useRef(0);
+  const syncing = useRef(false);
+  const [lobby, setLobby] = useState<BossLobby | null>(null);
+  const [lobbyError, setLobbyError] = useState("");
+  const [lobbyBusy, setLobbyBusy] = useState(false);
+  const [aimKnob, setAimKnob] = useState({ x: 0, y: 0 });
+  const [dialogueOpen, setDialogueOpen] = useState(false);
   const pointer = useRef<number | null>(null);
   const [knob, setKnob] = useState({ x: 0, y: 0 });
   const [phase, setPhase] = useState<Phase>("ready");
@@ -456,28 +556,21 @@ export default function BossEncounter({
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [dashReady, setDashReady] = useState(true);
   const [activePowerupUi, setActivePowerupUi] = useState<string | null>(null);
-  const [squadCount, setSquadCount] = useState<number>(3);
+  const [battleTimeStr, setBattleTimeStr] = useState("00:00");
   const [hud, setHud] = useState<{ hp: number; stage: BossStage; squadCount: number }>({
     hp: 100,
     stage: "human",
-    squadCount: 3,
+    squadCount: 1,
   });
   const [results, setResults] = useState<{
     squadCount: number;
     shotsLanded: number;
     shotsFired: number;
     hitsTaken: number;
+    durationStr: string;
   } | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const requested = new URLSearchParams(window.location.search).get("opponent");
-    if (requested === "kirkify" || requested === "diddy" || requested === "epstein") {
-      setOpponent(requested);
-    }
-  }, []);
 
   const toggleSound = () => {
     const next = !soundEnabled;
@@ -485,56 +578,69 @@ export default function BossEncounter({
     contraAudio.setEnabled(next);
   };
 
-  // Sprite Sheets Loader
+  // Sprite Sheets Loader with crisp alpha rendering
   useEffect(() => {
-    let active = true;
-    setLoaded(false);
-    setLoadError(false);
+    let cancelled = false;
 
     const loadImage = (src: string): Promise<HTMLImageElement> => {
       return new Promise((resolve, reject) => {
         const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = (e) => reject(new Error(`Failed to load ${src}`));
+        img.onload = () => {
+          resolve(img);
+        };
+        img.onerror = () => {
+          reject(new Error(`Failed to load ${src}`));
+        };
         img.src = src;
-        if (img.complete && img.naturalWidth > 0) resolve(img);
+        if (img.complete && img.naturalWidth > 0) {
+          resolve(img);
+        }
       });
     };
 
     Promise.all([
       loadImage(opponents[opponent].image),
       loadImage("/images/Pixel-Art%20Base%20Avatar%20Selection%20Sheet.png"),
+      loadImage("/images/island-board-v2.png"),
     ])
-      .then(([boss, avatar]) => {
-        if (!active) return;
-        images.current = { boss, avatar };
+      .then(([boss, avatar, island]) => {
+        if (cancelled) return;
+        images.current = { boss, avatar, island };
         setLoaded(true);
       })
       .catch(() => {
-        if (!active) return;
+        if (cancelled) return;
         setLoadError(true);
       });
 
     return () => {
-      active = false;
+      cancelled = true;
     };
   }, [opponent]);
 
   const finish = useCallback((result: "won" | "lost") => {
     battle.current.phase = result;
     controls.current.attack = false;
-    const finalStage = bossStage(battle.current.bossHp);
+    const effectiveCeiling = battle.current.maxBossHp;
+    const finalStage = bossStage(battle.current.bossHp, effectiveCeiling);
     battle.current.stage = finalStage;
+
     if (result === "won") {
       contraAudio.playVictory();
     } else {
       contraAudio.playExplosion();
     }
+
+    const m = Math.floor(battle.current.battleTimer / 60);
+    const s = Math.floor(battle.current.battleTimer % 60);
+    const durationStr = `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+
     setResults({
       squadCount: battle.current.squadCount,
       shotsLanded: battle.current.shotsLanded,
       shotsFired: battle.current.shotsFired,
       hitsTaken: battle.current.hitsTaken,
+      durationStr,
     });
     setHud({
       hp: battle.current.hp,
@@ -544,39 +650,104 @@ export default function BossEncounter({
     setPhase(result);
   }, []);
 
+  function rememberLobby(value: BossLobby | null) {
+    lobbyRef.current = value;
+    setLobby(value);
+  }
+
+  async function enterLobby() {
+    if (!game.room.id || lobbyBusy) return;
+    setLobbyBusy(true);
+    setLobbyError("");
+    try {
+      const value = await lobbyRequest(game.room.id, "join", { opponent });
+      rememberLobby(value);
+      raidDamage.current = value?.players.find(player => player.self)?.damageTotal ?? 0;
+    } catch (error) { setLobbyError(error instanceof Error ? error.message : "Could not join the lobby."); }
+    finally { setLobbyBusy(false); }
+  }
+
+  async function leaveLobby() {
+    setLobbyBusy(true);
+    try { await lobbyRequest(game.room.id, "leave"); rememberLobby(null); }
+    catch (error) { setLobbyError(error instanceof Error ? error.message : "Could not leave the lobby."); }
+    finally { setLobbyBusy(false); }
+  }
+
+  const hasLobby = lobby !== null;
+  useEffect(() => {
+    if (!hasLobby || !game.room.id) return;
+    let cancelled = false;
+    const update = async () => {
+      if (syncing.current) return;
+      syncing.current = true;
+      try {
+        const state = battle.current;
+        const next = await lobbyRequest(game.room.id, "heartbeat", { x: state.x, y: state.y, bossX: state.bossX, bossY: state.bossY, alive: phase !== "lost", damageTotal: raidDamage.current });
+        if (cancelled || !next) return;
+        rememberLobby(next);
+        setLobbyError("");
+        if (next.phase === "playing" && phase === "ready") {
+          const freshBattle = fresh(next.players.length, next.opponent);
+          freshBattle.phase = "playing";
+          freshBattle.hp = 100;
+          freshBattle.bossHp = next.hp;
+          freshBattle.maxBossHp = next.maxHp;
+          freshBattle.battleTimer = next.startedAt ? Math.max(0, (Date.now() - Date.parse(next.startedAt)) / 1000) : 0;
+          battle.current = freshBattle;
+          setOpponent(next.opponent);
+          setResults(null);
+          setDialogueOpen(true);
+          setPhase("playing");
+        } else if (next.phase === "playing" && phase === "playing") {
+          state.bossHp = next.hp;
+          state.maxBossHp = next.maxHp;
+        } else if (next.phase === "won" && phase === "playing") {
+          state.bossHp = 0;
+          finish("won");
+        }
+      } catch { if (!cancelled) setLobbyError("Connection lost. Reconnecting to your crew…"); }
+      finally { syncing.current = false; }
+    };
+    void update();
+    const timer = window.setInterval(update, 1500);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [hasLobby, game.room.id, phase, finish]);
+
   useEffect(() => () => { screen.orientation?.unlock?.(); }, []);
 
   const triggerDash = useCallback(() => {
     const state = battle.current;
     if (state.phase !== "playing" || state.dashCooldown > 0) return;
-    state.dashCooldown = 1.6;
-    state.dashTimer = 0.28;
-    state.invulnerable = Math.max(state.invulnerable, 0.42);
+    const speedBoost = state.activePowerup?.type === "speed";
+    state.dashCooldown = speedBoost ? 0.75 : 1.5;
+    state.dashTimer = 0.32;
+    state.invulnerable = Math.max(state.invulnerable, 0.45);
 
     const held = controls.current.keys;
-    let dx = controls.current.x + Number(held.has("arrowright") || held.has("d")) - Number(held.has("arrowleft") || held.has("a"));
-    let dy = controls.current.y + Number(held.has("arrowdown") || held.has("s")) - Number(held.has("arrowup") || held.has("w"));
+    const dx = controls.current.x + Number(held.has("arrowright") || held.has("d")) - Number(held.has("arrowleft") || held.has("a"));
+    const dy = controls.current.y + Number(held.has("arrowdown") || held.has("s")) - Number(held.has("arrowup") || held.has("w"));
     const mag = Math.hypot(dx, dy);
 
     if (mag > 0.1) {
-      state.dashVx = (dx / mag) * 580;
-      state.dashVy = (dy / mag) * 580;
+      state.dashVx = (dx / mag) * 620;
+      state.dashVy = (dy / mag) * 620;
     } else {
       state.dashVx = 0;
-      state.dashVy = -580;
+      state.dashVy = -620;
     }
 
     contraAudio.playDash();
 
     // Spawn splash burst
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < 14; i++) {
       state.particles.push({
-        x: state.x + (Math.random() - 0.5) * 20,
-        y: state.y + (Math.random() - 0.5) * 20,
-        vx: (Math.random() - 0.5) * 160 - state.dashVx * 0.15,
-        vy: (Math.random() - 0.5) * 160 - state.dashVy * 0.15,
-        life: 0.35,
-        maxLife: 0.35,
+        x: state.x + (Math.random() - 0.5) * 24,
+        y: state.y + (Math.random() - 0.5) * 24,
+        vx: (Math.random() - 0.5) * 180 - state.dashVx * 0.15,
+        vy: (Math.random() - 0.5) * 180 - state.dashVy * 0.15,
+        life: 0.38,
+        maxLife: 0.38,
         color: "#93c5fd",
         size: 3 + Math.random() * 4,
       });
@@ -586,8 +757,8 @@ export default function BossEncounter({
       id: Math.random(),
       text: "DODGE!",
       x: state.x,
-      y: state.y - 28,
-      vy: -50,
+      y: state.y - 30,
+      vy: -55,
       alpha: 1,
       color: "#67e8f9",
       size: 13,
@@ -596,15 +767,20 @@ export default function BossEncounter({
 
   useEffect(() => {
     const down = (event: KeyboardEvent) => {
+      if (phase !== "playing" || dialogueOpen) return;
       const key = event.key.toLowerCase();
       if (["arrowup", "arrowdown", "arrowleft", "arrowright", "w", "a", "s", "d", " "].includes(key)) {
         event.preventDefault();
       }
-      if (key === "shift" || key === "k") {
+      if (key === "shift") {
         event.preventDefault();
         triggerDash();
       }
       controls.current.keys.add(key);
+      const aimX = Number(controls.current.keys.has("l")) - Number(controls.current.keys.has("j"));
+      const aimY = Number(controls.current.keys.has("k")) - Number(controls.current.keys.has("i"));
+      const length = Math.hypot(aimX, aimY);
+      if (length) { controls.current.aimX = aimX / length; controls.current.aimY = aimY / length; }
     };
     const up = (event: KeyboardEvent) => controls.current.keys.delete(event.key.toLowerCase());
     const clear = () => {
@@ -623,7 +799,7 @@ export default function BossEncounter({
       window.removeEventListener("keyup", up);
       window.removeEventListener("blur", clear);
     };
-  }, [triggerDash]);
+  }, [triggerDash, phase, dialogueOpen]);
 
   // Main Encounter Engine
   useEffect(() => {
@@ -638,7 +814,7 @@ export default function BossEncounter({
     const render = (now: number) => {
       const state = battle.current;
       if (state.phase !== "playing") return;
-      if (document.hidden) {
+      if (document.hidden || dialogueOpen) {
         last = now;
         frame = requestAnimationFrame(render);
         return;
@@ -647,9 +823,16 @@ export default function BossEncounter({
       last = now;
 
       state.animTimer += dt;
+      state.battleTimer += dt;
       if (state.flinchTimer > 0) state.flinchTimer -= dt;
       if (state.bossFlashTimer > 0) state.bossFlashTimer -= dt;
       if (state.screenShake > 0) state.screenShake -= dt;
+      if (state.invulnerable > 0) state.invulnerable -= dt;
+
+      // Passive gentle health recovery if player hasn't taken hits recently (sustains long 5-15 min raids)
+      if (state.hp < state.maxHp && state.hitsTaken > 0 && state.flinchTimer <= 0) {
+        state.hp = Math.min(state.maxHp, state.hp + dt * 0.4);
+      }
 
       // Update Active Powerup
       if (state.activePowerup) {
@@ -673,8 +856,10 @@ export default function BossEncounter({
         .map((t) => ({ ...t, alpha: t.alpha - dt * 2.5 }))
         .filter((t) => t.alpha > 0);
 
-      // Current stage evaluation based on boss HP
-      const currentStage = bossStage(state.bossHp);
+      // Current stage evaluation: support both scaled raid HP and test harness fixture
+      const effectiveCeiling = state.maxBossHp;
+      const currentStage = bossStage(state.bossHp, effectiveCeiling);
+
       if (state.stage !== currentStage) {
         if (currentStage === "transformed" && state.stage === "human") {
           state.isTransforming = true;
@@ -711,6 +896,8 @@ export default function BossEncounter({
             timer: 2.5,
             maxTimer: 2.5,
           };
+          finish("won");
+          return;
         }
         state.stage = currentStage;
       }
@@ -745,447 +932,425 @@ export default function BossEncounter({
           dx /= magnitude;
           dy /= magnitude;
         }
-        const speedMultiplier = state.activePowerup?.type === "speed" ? 1.4 : 1.0;
-        state.x = Math.max(35, Math.min(W - 35, state.x + dx * 240 * speedMultiplier * dt));
-        state.y = Math.max(100, Math.min(H - 38, state.y + dy * 240 * speedMultiplier * dt));
+        const speedMultiplier = state.activePowerup?.type === "speed" ? 1.45 : 1.0;
+        state.x = Math.max(35, Math.min(W - 35, state.x + dx * 250 * speedMultiplier * dt));
+        state.y = Math.max(100, Math.min(H - 38, state.y + dy * 250 * speedMultiplier * dt));
       }
 
-      // Update Squad Companions (swim and fire alongside player)
-      state.companions.forEach((comp) => {
-        comp.shootTimer -= dt;
-        if (comp.shootTimer <= 0 && state.bossHp > 0 && !state.isTransforming) {
-          comp.shootTimer = 0.38 + Math.random() * 0.24;
-          const compX = state.x + comp.offsetX;
-          const compY = state.y + comp.offsetY;
-          const dist = Math.hypot(state.bossX - compX, state.bossY - compY) || 1;
-          state.shots.push({
-            x: compX,
-            y: compY - 12,
-            vx: ((state.bossX - compX) / dist) * 620,
-            vy: ((state.bossY - compY) / dist) * 620,
-          });
-          state.shotsFired += 1;
-          contraAudio.playShoot();
-        }
-      });
-
-      // Boss shield regeneration if squad is under 3 persons (impossible to solo/duo)
-      if (state.squadCount < 3 && state.bossHp < MAX_BOSS_HP && state.bossHp > 0) {
-        state.bossHp = Math.min(MAX_BOSS_HP, state.bossHp + 25 * dt);
-      }
-
-      state.invulnerable = Math.max(0, state.invulnerable - dt);
-      state.cooldown -= dt;
-      state.spawn -= dt;
-      state.rushClock -= dt;
-      state.laserClock -= dt;
-
+      // Boss Movement Dynamics (Tactical strafing across upper lagoon)
       const elapsed = state.animTimer;
       const isPhaseTwo = state.stage === "transformed" || state.stage === "enraged";
       const isEnraged = state.stage === "enraged";
+      const strafeSpeed = isEnraged ? 1.4 : isPhaseTwo ? 1.1 : 0.85;
+      const targetBossX = W / 2 + Math.sin(elapsed * strafeSpeed) * (W * 0.32);
+      const targetBossY = 130 + Math.sin(elapsed * 2.2) * 22;
 
-      // Boss Movement & Rushes
-      if (state.rushClock <= 0 && state.rushTime <= 0 && !state.isTransforming && state.bossHp > 0) {
+      // The host drives the shared boss position; guests follow its updates.
+      const remoteBoss = lobbyRef.current && !lobbyRef.current.host ? lobbyRef.current : null;
+      if (remoteBoss) {
+        state.bossX += (remoteBoss.bossX - state.bossX) * Math.min(1, dt * 5);
+        state.bossY += (remoteBoss.bossY - state.bossY) * Math.min(1, dt * 5);
+        state.rushTime = 0;
+      } else {
+      // Rush Attack Management
+      state.rushClock -= dt;
+      if (state.rushClock <= 0 && state.rushTime <= 0) {
+        state.rushTime = 2.2;
+        state.rushClock = isEnraged ? 6.5 : 9.0;
         state.rushX = state.x;
         state.rushY = state.y;
-        state.rushTime = 2.1;
-        state.rushClock = isEnraged ? 6 : isPhaseTwo ? 8 : 11;
-        contraAudio.playLaser();
       }
 
       if (state.rushTime > 0) {
-        state.rushTime = Math.max(0, state.rushTime - dt);
-        if (state.rushTime < 1.25) {
-          const distance = Math.hypot(state.rushX - state.bossX, state.rushY - state.bossY) || 1;
-          const step = Math.min(distance, (isEnraged ? 360 : 310) * dt);
-          state.bossX += ((state.rushX - state.bossX) / distance) * step;
-          state.bossY += ((state.rushY - state.bossY) / distance) * step;
+        state.rushTime -= dt;
+        if (state.rushTime > 1.25) {
+          // Telegraphing: Tracking player coordinate
+          state.rushX = state.x;
+          state.rushY = state.y;
+        } else {
+          // High-speed Rush Strike
+          state.bossX = state.bossX + (state.rushX - state.bossX) * (dt * 6.5);
+          state.bossY = state.bossY + (state.rushY - state.bossY) * (dt * 6.5);
+
+          // Rush Collision with Player
+          const distToPlayer = Math.hypot(state.bossX - state.x, state.bossY - state.y);
+          if (distToPlayer < 48 && state.invulnerable <= 0) {
+            state.invulnerable = 1.0;
+            state.hitsTaken += 1;
+            contraAudio.playPlayerHit();
+            state.screenShake = 0.35;
+            state.screenShakeIntensity = 7;
+
+            if (state.activePowerup?.type === "shield" && state.shieldHits > 0) {
+              state.shieldHits -= 1;
+              state.floatingTexts.push({
+                id: Math.random(),
+                text: "SHIELD BLOCKED!",
+                x: state.x,
+                y: state.y - 25,
+                vy: -40,
+                alpha: 1,
+                color: "#60a5fa",
+                size: 13,
+              });
+              if (state.shieldHits <= 0) state.activePowerup = null;
+            } else {
+              state.hp = Math.max(0, state.hp - (isEnraged ? 28 : 20));
+              state.floatingTexts.push({
+                id: Math.random(),
+                text: isEnraged ? "-28 HP" : "-20 HP",
+                x: state.x,
+                y: state.y - 25,
+                vy: -40,
+                alpha: 1,
+                color: "#f87171",
+                size: 14,
+              });
+              if (state.hp <= 0) {
+                finish("lost");
+                return;
+              }
+            }
+          }
         }
-      } else if (!state.isTransforming && state.bossHp > 0) {
-        const swayWidth = isEnraged ? 260 : isPhaseTwo ? 220 : 180;
-        const targetX = W / 2 + Math.sin(elapsed * 0.8) * swayWidth;
-        const targetY = (isPhaseTwo ? 140 : 120) + Math.sin(elapsed * 1.3) * 25;
-        state.bossX += (targetX - state.bossX) * Math.min(1, dt * 1.8);
-        state.bossY += (targetY - state.bossY) * Math.min(1, dt * 1.8);
+      } else {
+        state.bossX += (targetBossX - state.bossX) * (dt * 2.8);
+        state.bossY += (targetBossY - state.bossY) * (dt * 2.8);
+      }
       }
 
-      // Laser Beam Sweep Telegraph & Execution (Phase 2 & 3)
-      if (isPhaseTwo && state.laserClock <= 0 && !state.laser && state.bossHp > 0) {
+      // Laser Beam Telegraph & Fire
+      state.laserClock -= dt;
+      if (state.laserClock <= 0 && !state.laser) {
         state.laser = {
           x: state.bossX,
           y: state.bossY,
           targetX: state.x,
           targetY: state.y,
-          chargeTimer: 1.1,
-          fireTimer: 0.5,
+          chargeTimer: 1.4,
+          fireTimer: 0.55,
         };
-        state.laserClock = isEnraged ? 7.5 : 10.5;
-        contraAudio.playLaser();
+        state.laserClock = isEnraged ? 7.0 : 10.0;
       }
 
       if (state.laser) {
-        state.laser.x = state.bossX;
-        state.laser.y = state.bossY + 25;
         if (state.laser.chargeTimer > 0) {
           state.laser.chargeTimer -= dt;
-          // Slowly track player while charging
-          state.laser.targetX += (state.x - state.laser.targetX) * dt * 2.2;
-          state.laser.targetY += (state.y - state.laser.targetY) * dt * 2.2;
+          state.laser.x = state.bossX;
+          state.laser.y = state.bossY;
+          state.laser.targetX = state.x;
+          state.laser.targetY = state.y;
         } else if (state.laser.fireTimer > 0) {
           state.laser.fireTimer -= dt;
-          state.screenShake = 0.2;
-          state.screenShakeIntensity = 4;
-          // Spawn laser beam hazard orbs (radius: 11) along the laser line
-          if (state.laser.fireTimer > 0.42) {
-            const angle = Math.atan2(state.laser.targetY - state.laser.y, state.laser.targetX - state.laser.x);
-            for (let dist = 80; dist < 500; dist += 90) {
-              state.hazards.push({
-                x: state.laser.x + Math.cos(angle) * dist,
-                y: state.laser.y + Math.sin(angle) * dist,
-                vx: Math.cos(angle + 1.57) * 40,
-                vy: Math.sin(angle + 1.57) * 40,
-                radius: 11,
-              });
+          // Check collision with beam
+          const dist = Math.hypot(state.laser.targetX - state.laser.x, state.laser.targetY - state.laser.y);
+          const nx = (state.laser.targetX - state.laser.x) / (dist || 1);
+          const ny = (state.laser.targetY - state.laser.y) / (dist || 1);
+          const px = state.x - state.laser.x;
+          const py = state.y - state.laser.y;
+          const dot = px * nx + py * ny;
+          const projX = state.laser.x + nx * dot;
+          const projY = state.laser.y + ny * dot;
+          const perpDist = Math.hypot(state.x - projX, state.y - projY);
+
+          if (dot > 0 && dot < dist + 40 && perpDist < 26 && state.invulnerable <= 0) {
+            state.invulnerable = 0.9;
+            state.hitsTaken += 1;
+            contraAudio.playPlayerHit();
+            state.screenShake = 0.3;
+            state.screenShakeIntensity = 6;
+            state.hp = Math.max(0, state.hp - 22);
+            state.floatingTexts.push({
+              id: Math.random(),
+              text: "BEAM HIT -22",
+              x: state.x,
+              y: state.y - 25,
+              vy: -40,
+              alpha: 1,
+              color: "#f87171",
+              size: 13,
+            });
+            if (state.hp <= 0) {
+              finish("lost");
+              return;
             }
           }
-          if (state.laser.fireTimer <= 0) {
-            state.laser = null;
-          }
+        } else {
+          state.laser = null;
         }
       }
 
-      // Boss Attack Spawns (radius: 11 for test compatibility)
-      if (state.spawn <= 0 && state.bossHp > 0 && !state.isTransforming) {
-        state.spawn = isEnraged ? 0.65 : isPhaseTwo ? 0.9 : 1.35;
-        const angle = Math.atan2(state.y - state.bossY, state.x - state.bossX);
+      // Player Firing
+      const attacking = controls.current.attack || held.has(" ");
+      state.cooldown -= dt;
+      if (attacking && state.cooldown <= 0) {
+        state.cooldown = state.activePowerup?.type === "spread" ? 0.15 : 0.18;
+        state.shotsFired += 1;
+        contraAudio.playShoot();
 
-        if (isEnraged) {
-          // 5-way barrage
-          for (const offset of [-0.4, -0.2, 0, 0.2, 0.4]) {
+        const angle = Math.atan2(controls.current.aimY, controls.current.aimX);
+        const offsets = state.activePowerup?.type === "spread" ? [-0.2, 0, 0.2] : [0];
+        for (const offset of offsets) {
+          const dx = Math.cos(angle + offset), dy = Math.sin(angle + offset);
+          state.shots.push({ x: state.x + dx * 30, y: state.y + dy * 30, vx: dx * 600, vy: dy * 600, color: offsets.length > 1 ? "#23ced9" : "#ffdf73", damage: offsets.length > 1 ? 10 : 12 });
+        }
+      }
+
+      // Boss Hazard Spawning (Cluster attacks, spiral bursts, wave fans)
+      state.spawn -= dt;
+      if (state.spawn <= 0) {
+        state.spawn = isEnraged ? 0.75 : isPhaseTwo ? 1.0 : 1.25;
+        const pattern = Math.floor(Math.random() * 3);
+
+        if (pattern === 0) {
+          // Circular / Fan Wave
+          const count = isEnraged ? 7 : isPhaseTwo ? 5 : 3;
+          const arc = Math.PI * 0.65;
+          const baseAngle = Math.PI / 2;
+          for (let i = 0; i < count; i++) {
+            const angle = baseAngle - arc / 2 + (arc / (count - 1 || 1)) * i;
             state.hazards.push({
               x: state.bossX,
               y: state.bossY + 25,
-              vx: Math.cos(angle + offset) * 190,
-              vy: Math.sin(angle + offset) * 190,
+              vx: Math.cos(angle) * 230,
+              vy: Math.sin(angle) * 230,
               radius: 11,
+              color: opponents[opponent].accent,
             });
           }
-          // Extra spiral orb
-          state.spiralAngle += 0.55;
-          state.hazards.push({
-            x: state.bossX,
-            y: state.bossY + 25,
-            vx: Math.cos(state.spiralAngle) * 160,
-            vy: Math.sin(state.spiralAngle) * 160,
-            radius: 11,
-          });
-        } else if (isPhaseTwo) {
-          // 3-way spread
-          for (const offset of [-0.25, 0, 0.25]) {
+        } else if (pattern === 1) {
+          // Targeted Aimed Burst
+          const aimDx = state.x - state.bossX;
+          const aimDy = state.y - state.bossY;
+          for (let offset = -0.18; offset <= 0.18; offset += 0.18) {
+            const angle = Math.atan2(aimDy, aimDx) + offset;
             state.hazards.push({
               x: state.bossX,
               y: state.bossY + 25,
-              vx: Math.cos(angle + offset) * 175,
-              vy: Math.sin(angle + offset) * 175,
+              vx: Math.cos(angle) * 260,
+              vy: Math.sin(angle) * 260,
               radius: 11,
+              color: "#f87171",
             });
           }
         } else {
-          // Phase 1 targeted hazard
+          // Spiral Barrage
+          state.spiralAngle += 0.45;
           state.hazards.push({
             x: state.bossX,
-            y: state.bossY + 20,
-            vx: Math.cos(angle) * 165,
-            vy: Math.sin(angle) * 165,
+            y: state.bossY + 25,
+            vx: Math.sin(state.spiralAngle) * 240,
+            vy: Math.cos(state.spiralAngle) * 240,
             radius: 11,
+            color: "#fbbf24",
           });
         }
       }
 
-      // Floating Powerups Spawner
+      // Power-up Spawning (Health Medkits, Spread, Shield, Speed)
       state.powerupSpawnTimer -= dt;
-      if (state.powerupSpawnTimer <= 0 && state.phase === "playing") {
-        state.powerupSpawnTimer = 16 + Math.random() * 8;
-        const types: PowerupType[] = ["spread", "shield", "speed"];
+      if (state.powerupSpawnTimer <= 0) {
+        state.powerupSpawnTimer = 11 + Math.random() * 6;
+        const types: PowerupType[] = ["heal", "spread", "shield", "speed"];
         const chosen = types[Math.floor(Math.random() * types.length)];
         state.powerups.push({
           id: Math.random(),
-          x: 90 + Math.random() * (W - 180),
-          y: 130 + Math.random() * (H - 240),
+          x: 60 + Math.random() * (W - 120),
+          y: 200 + Math.random() * (H - 260),
           type: chosen,
           radius: 18,
           pulse: 0,
         });
       }
 
-      // Check player collecting powerup
-      state.powerups = state.powerups.filter((p) => {
-        p.pulse += dt * 3;
-        p.y += Math.sin(p.pulse) * 0.4;
-        if (Math.hypot(state.x - p.x, state.y - p.y) < p.radius + 24) {
-          state.activePowerup = {
-            type: p.type,
-            timer: p.type === "shield" ? 15 : 10,
-          };
-          contraAudio.playRevive();
-          const label =
-            p.type === "spread"
-              ? "⚡ SPREAD SHOT!"
-              : p.type === "shield"
-              ? "🛡️ BUBBLE SHIELD!"
-              : "💨 TURBO FINS!";
-          state.floatingTexts.push({
-            id: Math.random(),
-            text: label,
-            x: p.x,
-            y: p.y - 20,
-            vy: -50,
-            alpha: 1,
-            color: p.type === "spread" ? "#fde047" : p.type === "shield" ? "#60a5fa" : "#34d399",
-            size: 14,
-          });
-          for (let i = 0; i < 16; i++) {
-            state.particles.push({
-              x: p.x,
-              y: p.y,
-              vx: (Math.random() - 0.5) * 180,
-              vy: (Math.random() - 0.5) * 180,
-              life: 0.45,
-              maxLife: 0.45,
-              color: "#fde047",
-              size: 3 + Math.random() * 4,
-            });
-          }
-          return false;
-        }
-        return true;
-      });
-
-      // Player Attack / Blaster Fire (radius: 5 for test compatibility)
-      if (
-        (controls.current.attack || held.has(" ") || held.has("j")) &&
-        state.cooldown <= 0 &&
-        state.bossHp > 0
-      ) {
-        state.cooldown = state.activePowerup?.type === "speed" ? 0.1 : 0.16;
-        state.shotsFired += 1;
-        contraAudio.playShoot();
-
-        const distance = Math.hypot(state.bossX - state.x, state.bossY - state.y) || 1;
-        const baseVx = ((state.bossX - state.x) / distance) * 620;
-        const baseVy = ((state.bossY - state.y) / distance) * 620;
-
-        state.shots.push({
-          x: state.x,
-          y: state.y - 12,
-          vx: baseVx,
-          vy: baseVy,
-        });
-
-        // Spread shot powerup fires 2 additional angled projectiles
-        if (state.activePowerup?.type === "spread") {
-          state.shotsFired += 2;
-          const angle = Math.atan2(baseVy, baseVx);
-          for (const off of [-0.22, 0.22]) {
-            state.shots.push({
-              x: state.x,
-              y: state.y - 12,
-              vx: Math.cos(angle + off) * 620,
-              vy: Math.sin(angle + off) * 620,
-            });
-          }
-        }
-      }
-
-      // Update Player Shots
-      state.shots = state.shots.filter((shot) => {
-        shot.x += shot.vx * dt;
-        shot.y += shot.vy * dt;
-        const hitDistance = isPhaseTwo ? 65 : 50;
-        if (Math.hypot(shot.x - state.bossX, shot.y - state.bossY) < hitDistance) {
-          const isCrit = state.shotsLanded % 5 === 0;
-          let dmg = isCrit ? 25 : 15;
-          const isShielded = state.squadCount < 3;
-          if (isShielded) {
-            dmg = 1; // 93% damage deflected without 3-person squad
-          }
-          state.bossHp = Math.max(0, state.bossHp - dmg);
-          state.shotsLanded += 1;
-          state.flinchTimer = 0.12;
-          state.bossFlashTimer = 0.14;
-          contraAudio.playBossHit();
-
-          // Spark particles
-          for (let i = 0; i < 4; i++) {
-            state.particles.push({
-              x: shot.x,
-              y: shot.y,
-              vx: (Math.random() - 0.5) * 220,
-              vy: (Math.random() - 0.5) * 220,
-              life: 0.25,
-              maxLife: 0.25,
-              color: isShielded ? "#c084fc" : isCrit ? "#fde047" : "#fdba74",
-              size: 2 + Math.random() * 3,
-            });
-          }
-
-          return false;
-        }
-        return shot.x > -20 && shot.x < W + 20 && shot.y > -20 && shot.y < H + 20;
-      });
-
-      // Hit Player Function
-      const hitPlayer = () => {
-        if (state.invulnerable <= 0) {
-          if (state.activePowerup?.type === "shield") {
-            // Shield absorbs damage
-            state.activePowerup = null;
-            state.invulnerable = 0.8;
-            contraAudio.playBossHit();
+      // Update Powerups & Player Pickup
+      state.powerups.forEach((p) => {
+        p.pulse += dt * 3.5;
+        const dist = Math.hypot(state.x - p.x, state.y - p.y);
+        if (dist < 38) {
+          contraAudio.playPowerup();
+          if (p.type === "heal") {
+            state.hp = Math.min(state.maxHp, state.hp + 30);
             state.floatingTexts.push({
               id: Math.random(),
-              text: "SHIELD BLOCKED!",
+              text: "+30 HP",
               x: state.x,
               y: state.y - 30,
               vy: -45,
               alpha: 1,
-              color: "#93c5fd",
+              color: "#34d399",
               size: 14,
             });
-            for (let i = 0; i < 18; i++) {
-              state.particles.push({
-                x: state.x,
-                y: state.y,
-                vx: (Math.random() - 0.5) * 220,
-                vy: (Math.random() - 0.5) * 220,
-                life: 0.35,
-                maxLife: 0.35,
-                color: "#60a5fa",
-                size: 3 + Math.random() * 4,
-              });
-            }
-            return;
+          } else {
+            state.activePowerup = { type: p.type, timer: 12 };
+            if (p.type === "shield") state.shieldHits = 3;
+            state.floatingTexts.push({
+              id: Math.random(),
+              text: p.type.toUpperCase() + " ACTIVE!",
+              x: state.x,
+              y: state.y - 30,
+              vy: -45,
+              alpha: 1,
+              color: p.type === "spread" ? "#f59e0b" : p.type === "shield" ? "#60a5fa" : "#10b981",
+              size: 13,
+            });
           }
-
-          state.hp = Math.max(0, state.hp - 20);
-          state.hitsTaken += 1;
-          state.invulnerable = 1.1;
-          state.screenShake = 0.25;
-          state.screenShakeIntensity = 6;
-          contraAudio.playPlayerHit();
-
-          state.floatingTexts.push({
-            id: Math.random(),
-            text: "-20 HP",
-            x: state.x,
-            y: state.y - 30,
-            vy: -45,
-            alpha: 1,
-            color: "#f87171",
-            size: 14,
-          });
         }
-      };
-
-      // Update Boss Hazards
-      state.hazards = state.hazards.filter((hazard) => {
-        hazard.x += hazard.vx * dt;
-        hazard.y += hazard.vy * dt;
-        if (Math.hypot(hazard.x - state.x, hazard.y - state.y) < hazard.radius + 20) {
-          hitPlayer();
-          return false;
-        }
-        return hazard.x > -40 && hazard.x < W + 40 && hazard.y > -40 && hazard.y < H + 40;
       });
+      state.powerups = state.powerups.filter((p) => Math.hypot(state.x - p.x, state.y - p.y) >= 38);
 
-      // Check Boss Rush Collision
-      if (
-        state.rushTime > 0 &&
-        state.rushTime < 1.25 &&
-        Math.hypot(state.x - state.bossX, state.y - state.bossY) < (isPhaseTwo ? 65 : 55)
-      ) {
-        hitPlayer();
-      }
+      // Update Shots & Collisions with Boss
+      state.shots.forEach((s) => {
+        s.x += s.vx * dt;
+        s.y += s.vy * dt;
 
-      // Update Particles
-      state.particles = state.particles
-        .map((p) => {
-          p.x += p.vx * dt;
-          p.y += p.vy * dt;
-          p.life -= dt;
-          return p;
-        })
-        .filter((p) => p.life > 0);
+        // Collision with Boss
+        const distToBoss = Math.hypot(s.x - state.bossX, s.y - state.bossY);
+        if (distToBoss < 58 && state.bossHp > 0) {
+          state.shotsLanded += 1;
+          state.bossFlashTimer = 0.08;
+          contraAudio.playBossHit();
 
-      // Update Floating Texts
-      state.floatingTexts = state.floatingTexts
-        .map((ft) => {
-          ft.y += ft.vy * dt;
-          ft.alpha -= dt * 1.6;
-          return ft;
-        })
-        .filter((ft) => ft.alpha > 0);
+          const dmg = s.damage || 10;
+          if (lobbyRef.current) raidDamage.current += dmg;
+          else state.bossHp = Math.max(bossHealthFloor(state.maxBossHp, state.battleTimer, TARGET_RAID_DURATION_SECONDS[opponent]), state.bossHp - dmg);
 
-      // Outcome Evaluation
-      if (state.hp <= 0) {
-        finish("lost");
-        return;
-      }
-      if (state.bossHp <= 0) {
-        finish("won");
-        return;
-      }
+          // Impact spark particle
+          for (let i = 0; i < 4; i++) {
+            state.particles.push({
+              x: s.x,
+              y: s.y,
+              vx: (Math.random() - 0.5) * 120,
+              vy: (Math.random() - 0.5) * 120,
+              life: 0.22,
+              maxLife: 0.22,
+              color: s.color || "#fde047",
+              size: 2 + Math.random() * 2,
+            });
+          }
+        }
+      });
+      state.shots = state.shots.filter(
+        (s) => s.y > 0 && s.y < H && s.x > 0 && s.x < W && Math.hypot(s.x - state.bossX, s.y - state.bossY) >= 58
+      );
 
-      // --- RENDERING CANVAS ---
+      // Update Hazards & Collisions with Player
+      state.hazards.forEach((h) => {
+        h.x += h.vx * dt;
+        h.y += h.vy * dt;
+
+        const distToPlayer = Math.hypot(h.x - state.x, h.y - state.y);
+        if (distToPlayer < 24 && state.invulnerable <= 0) {
+          state.invulnerable = 0.85;
+          state.hitsTaken += 1;
+          contraAudio.playPlayerHit();
+          state.screenShake = 0.25;
+          state.screenShakeIntensity = 5;
+
+          if (state.activePowerup?.type === "shield" && state.shieldHits > 0) {
+            state.shieldHits -= 1;
+            state.floatingTexts.push({
+              id: Math.random(),
+              text: "ABSORBED!",
+              x: state.x,
+              y: state.y - 25,
+              vy: -40,
+              alpha: 1,
+              color: "#60a5fa",
+              size: 12,
+            });
+            if (state.shieldHits <= 0) state.activePowerup = null;
+          } else {
+            state.hp = Math.max(0, state.hp - 12);
+            state.floatingTexts.push({
+              id: Math.random(),
+              text: "-12",
+              x: state.x,
+              y: state.y - 25,
+              vy: -40,
+              alpha: 1,
+              color: "#f87171",
+              size: 13,
+            });
+            if (state.hp <= 0) {
+              finish("lost");
+              return;
+            }
+          }
+        }
+      });
+      state.hazards = state.hazards.filter(
+        (h) => h.y > -20 && h.y < H + 20 && h.x > -20 && h.x < W + 20 && Math.hypot(h.x - state.x, h.y - state.y) >= 24
+      );
+
+      // Update Particles & Floating Texts
+      state.particles.forEach((p) => {
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.life -= dt;
+      });
+      state.particles = state.particles.filter((p) => p.life > 0);
+
+      state.floatingTexts.forEach((ft) => {
+        ft.y += ft.vy * dt;
+        ft.alpha -= dt * 1.4;
+      });
+      state.floatingTexts = state.floatingTexts.filter((ft) => ft.alpha > 0);
+
+      // =====================================================================
+      // Canvas Rendering Pipeline (Crisp, High-Quality Cutout Graphics)
+      // =====================================================================
       ctx.save();
+      ctx.imageSmoothingEnabled = false;
 
-      // Screen Shake translation
+      // Screen Shake
       if (state.screenShake > 0) {
-        const shakeX = (Math.random() - 0.5) * state.screenShakeIntensity * 2;
-        const shakeY = (Math.random() - 0.5) * state.screenShakeIntensity * 2;
+        const shakeX = (Math.random() - 0.5) * state.screenShakeIntensity;
+        const shakeY = (Math.random() - 0.5) * state.screenShakeIntensity;
         ctx.translate(shakeX, shakeY);
       }
 
-      // 1. Water Background with Dynamic Ripples
-      const water = ctx.createLinearGradient(0, 0, 0, H);
-      if (isEnraged) {
-        water.addColorStop(0, "#2b0a1a");
-        water.addColorStop(1, "#0d0408");
-      } else if (isPhaseTwo) {
-        water.addColorStop(0, "#191238");
-        water.addColorStop(1, "#081d2a");
-      } else {
-        water.addColorStop(0, "#125e6b");
-        water.addColorStop(1, "#083c52");
+      // Keep the arena grounded in the same island artwork as the route.
+      ctx.fillStyle = "#115764";
+      ctx.fillRect(0, 0, W, H);
+      const island = images.current.island;
+      if (island?.complete && island.naturalWidth) {
+        ctx.drawImage(island, 0, island.naturalHeight * 0.32, island.naturalWidth, island.naturalHeight * 0.38, 0, 0, W, H);
+        ctx.fillStyle = "rgba(7, 84, 91, 0.55)";
+        ctx.fillRect(0, 0, W, H);
       }
-      ctx.fillStyle = water;
-      ctx.fillRect(-10, -10, W + 20, H + 20);
 
-      // Water Caustics / Surface Highlights
-      ctx.strokeStyle = isEnraged ? "#fca5a528" : isPhaseTwo ? "#c4b5fd25" : "#9cdedb30";
-      ctx.lineWidth = 2;
-      for (let i = 0; i < 14; i += 1) {
-        const wx = (i * 105 + elapsed * 8) % W;
-        const wy = 90 + (i * 77) % 410;
+      // Dynamic water caustics pattern
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+      ctx.lineWidth = 1.5;
+      for (let y = 30; y < H; y += 45) {
         ctx.beginPath();
-        ctx.ellipse(wx, wy, 32, 6, 0, 0, Math.PI * 2);
+        const waveOffset = Math.sin(y * 0.04 + elapsed * 1.5) * 16;
+        ctx.moveTo(0, y + waveOffset);
+        ctx.bezierCurveTo(
+          W * 0.33,
+          y - 12 + waveOffset,
+          W * 0.66,
+          y + 12 + waveOffset,
+          W,
+          y + waveOffset
+        );
         ctx.stroke();
       }
 
-      // Dash Trails (afterimages)
+      // Player Dash Ghost Trails
       state.dashTrail.forEach((t) => {
-        ctx.fillStyle = `rgba(147, 197, 253, ${t.alpha * 0.4})`;
+        ctx.fillStyle = `rgba(56, 189, 248, ${t.alpha * 0.45})`;
         ctx.beginPath();
-        ctx.arc(t.x, t.y, 22, 0, Math.PI * 2);
+        ctx.arc(t.x, t.y - 10, 24, 0, Math.PI * 2);
         ctx.fill();
       });
 
-      // Laser Telegraph Line & Beam
+      // Laser Telegraph & Beam
       if (state.laser) {
         if (state.laser.chargeTimer > 0) {
-          // Warning laser line
-          ctx.strokeStyle = `rgba(244, 63, 94, ${0.4 + Math.sin(state.animTimer * 20) * 0.3})`;
-          ctx.lineWidth = 3;
+          ctx.strokeStyle = "rgba(244, 63, 94, 0.75)";
+          ctx.lineWidth = 2;
           ctx.setLineDash([8, 6]);
           ctx.beginPath();
           ctx.moveTo(state.laser.x, state.laser.y);
@@ -1193,14 +1358,11 @@ export default function BossEncounter({
           ctx.stroke();
           ctx.setLineDash([]);
 
-          // Flashing reticle
-          ctx.strokeStyle = "#f43f5e";
-          ctx.lineWidth = 2;
+          ctx.fillStyle = "rgba(244, 63, 94, 0.2)";
           ctx.beginPath();
-          ctx.arc(state.laser.targetX, state.laser.targetY, 16, 0, Math.PI * 2);
-          ctx.stroke();
+          ctx.arc(state.laser.targetX, state.laser.targetY, 18, 0, Math.PI * 2);
+          ctx.fill();
         } else if (state.laser.fireTimer > 0) {
-          // Firing beam
           ctx.strokeStyle = "#fecdd3";
           ctx.lineWidth = 14;
           ctx.beginPath();
@@ -1217,129 +1379,108 @@ export default function BossEncounter({
         }
       }
 
-      // Rush Telegraph Warning
+      // Rush Telegraph Guideline
       if (state.rushTime > 1.25) {
         ctx.strokeStyle = opponents[opponent].accent;
-        ctx.lineWidth = 4;
+        ctx.lineWidth = 3;
         ctx.setLineDash([10, 8]);
         ctx.beginPath();
-        ctx.arc(state.rushX, state.rushY, 60, 0, Math.PI * 2);
+        ctx.arc(state.rushX, state.rushY, 56, 0, Math.PI * 2);
         ctx.stroke();
         ctx.setLineDash([]);
       }
 
-      // 2. Boss Sprite Rendering
+      // 2. Boss Sprite Rendering (100% Clean Cutout PNG)
       const sprite = images.current.boss;
       const spriteMap = SPRITE_MAPS[opponent];
       if (sprite?.complete && sprite.naturalWidth) {
         let frameRect: Frame;
-        let drawWidth: number;
         let drawHeight: number;
 
         if (state.bossHp <= 0) {
-          // Defeated animation
           const frames = spriteMap.defeated;
           const idx = Math.min(frames.length - 1, Math.floor(state.animTimer * 2) % frames.length);
           frameRect = frames[idx];
-          drawWidth = 120;
           drawHeight = 110;
         } else if (state.isTransforming) {
-          // Transformation sequence
           const frames = spriteMap.transform;
-          const idx = Math.min(
-            frames.length - 1,
-            Math.floor(state.transformProgress * frames.length)
-          );
+          const idx = Math.min(frames.length - 1, Math.floor(state.transformProgress * frames.length));
           frameRect = frames[idx];
-          drawWidth = 145;
           drawHeight = 135;
 
-          // Radial transformation aura
           ctx.strokeStyle = opponents[opponent].accent;
-          ctx.lineWidth = 4;
+          ctx.lineWidth = 3.5;
           ctx.beginPath();
-          ctx.arc(state.bossX, state.bossY, 70 + Math.sin(state.animTimer * 15) * 12, 0, Math.PI * 2);
+          ctx.arc(state.bossX, state.bossY, 68 + Math.sin(state.animTimer * 15) * 12, 0, Math.PI * 2);
           ctx.stroke();
         } else if (isEnraged) {
-          // Enraged state
-          const frames = state.rushTime > 0 && state.rushTime < 1.25
-            ? spriteMap.phase2Attack
-            : spriteMap.phase2Enraged;
+          const frames =
+            state.rushTime > 0 && state.rushTime < 1.25
+              ? spriteMap.phase2Attack
+              : spriteMap.phase2Enraged;
           const idx = Math.floor(state.animTimer * 5) % frames.length;
           frameRect = frames[idx];
-          drawWidth = 145;
           drawHeight = 140;
 
           // Fiery aura
           ctx.strokeStyle = "#f87171";
           ctx.lineWidth = 3;
           ctx.beginPath();
-          ctx.arc(state.bossX, state.bossY, 65, 0, Math.PI * 2);
+          ctx.arc(state.bossX, state.bossY, 64, 0, Math.PI * 2);
           ctx.stroke();
         } else if (isPhaseTwo) {
-          // Transformed Monster Form
-          const frames = state.rushTime > 0 && state.rushTime < 1.25
-            ? spriteMap.phase2Attack
-            : spriteMap.phase2Idle;
+          const frames =
+            state.rushTime > 0 && state.rushTime < 1.25
+              ? spriteMap.phase2Attack
+              : spriteMap.phase2Idle;
           const idx = Math.floor(state.animTimer * 4) % frames.length;
           frameRect = frames[idx];
-          drawWidth = 140;
           drawHeight = 130;
         } else {
-          // Phase 1: Human Form
-          const frames = state.flinchTimer > 0
-            ? spriteMap.humanHit
-            : state.rushTime > 0 && state.rushTime < 1.25
-            ? spriteMap.humanAttack
-            : Math.abs(state.bossX - (W / 2 + Math.sin(elapsed * 0.8) * 180)) > 2
-            ? spriteMap.humanWalk
-            : spriteMap.humanIdle;
+          const frames =
+            state.flinchTimer > 0
+              ? spriteMap.humanHit
+              : state.rushTime > 0 && state.rushTime < 1.25
+              ? spriteMap.humanAttack
+              : Math.abs(state.bossX - (W / 2 + Math.sin(elapsed * strafeSpeed) * (W * 0.32))) > 2
+              ? spriteMap.humanWalk
+              : spriteMap.humanIdle;
           const idx = Math.floor(state.animTimer * 4) % frames.length;
           frameRect = frames[idx];
-          drawWidth = 84;
           drawHeight = 126;
         }
 
-        const [sx, sy, sw, sh] = frameRect;
+        const [, , sw, sh] = frameRect;
         const aspect = sw / sh;
         const actualWidth = Math.round(drawHeight * aspect);
 
-        // Draw soft water shadow under boss
+        // Water Ripple Shadow under Boss
         ctx.fillStyle = "rgba(0, 0, 0, 0.28)";
         ctx.beginPath();
-        ctx.ellipse(state.bossX, state.bossY + drawHeight / 2 - 8, Math.min(actualWidth * 0.45, 60), 12, 0, 0, Math.PI * 2);
+        ctx.ellipse(state.bossX, state.bossY + drawHeight / 2 - 8, Math.min(actualWidth * 0.45, 62), 12, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.drawImage(
-          sprite,
-          sx,
-          sy,
-          sw,
-          sh,
-          state.bossX - actualWidth / 2,
-          state.bossY - drawHeight / 2,
-          actualWidth,
-          drawHeight
-        );
+        // Draw Boss Sprite (pixelated, completely transparent background)
+        ctx.drawImage(cleanBossFrame(sprite, frameRect), Math.round(state.bossX - actualWidth / 2), Math.round(state.bossY - drawHeight / 2), actualWidth, drawHeight);
 
         // White flash when taking damage
         if (state.bossFlashTimer > 0) {
           ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
           ctx.beginPath();
-          ctx.arc(state.bossX, state.bossY, drawWidth * 0.4, 0, Math.PI * 2);
+          ctx.arc(state.bossX, state.bossY, actualWidth * 0.38, 0, Math.PI * 2);
           ctx.fill();
         }
 
-        // Syndicate Void Shield (active when squad is under 3 persons)
-        if (state.squadCount < 3 && state.bossHp > 0) {
+        // The endurance shield is active until the encounter's minimum time.
+        if (state.bossHp > 0 && state.battleTimer < TARGET_RAID_DURATION_SECONDS[opponent]) {
           ctx.save();
-          ctx.strokeStyle = `rgba(192, 132, 252, ${0.75 + Math.sin(state.animTimer * 5) * 0.2})`;
+          ctx.strokeStyle = `rgba(35, 206, 217, ${0.75 + Math.sin(state.animTimer * 5) * 0.2})`;
           ctx.lineWidth = 4;
           ctx.setLineDash([8, 6]);
           ctx.beginPath();
           ctx.arc(state.bossX, state.bossY, isPhaseTwo ? 85 : 72, 0, Math.PI * 2);
           ctx.stroke();
-          ctx.fillStyle = "rgba(192, 132, 252, 0.12)";
+          ctx.fillStyle = "rgba(35, 206, 217, 0.12)";
           ctx.fill();
           ctx.restore();
         }
@@ -1348,11 +1489,18 @@ export default function BossEncounter({
       // 3. Floating Powerups
       state.powerups.forEach((p) => {
         const pulseScale = 1 + Math.sin(p.pulse) * 0.12;
-        const color = p.type === "spread" ? "#f59e0b" : p.type === "shield" ? "#3b82f6" : "#10b981";
+        const color =
+          p.type === "spread"
+            ? "#f59e0b"
+            : p.type === "shield"
+            ? "#3b82f6"
+            : p.type === "speed"
+            ? "#10b981"
+            : "#f43f5e";
 
         ctx.fillStyle = `${color}33`;
         ctx.beginPath();
-        ctx.arc(p.x, p.y, p.radius * pulseScale * 1.3, 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, p.radius * pulseScale * 1.35, 0, Math.PI * 2);
         ctx.fill();
 
         ctx.strokeStyle = color;
@@ -1365,12 +1513,16 @@ export default function BossEncounter({
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillStyle = "#ffffff";
-        ctx.fillText(p.type === "spread" ? "⭐" : p.type === "shield" ? "🛡️" : "⚡", p.x, p.y);
+        ctx.fillText(
+          p.type === "spread" ? "⭐" : p.type === "shield" ? "🛡️" : p.type === "speed" ? "⚡" : "💖",
+          p.x,
+          p.y
+        );
       });
 
-      // 4. Boss Hazards Rendering (radius === 11)
+      // 4. Boss Hazards (radius === 11)
       state.hazards.forEach((hazard) => {
-        ctx.fillStyle = opponents[opponent].accent;
+        ctx.fillStyle = hazard.color || opponents[opponent].accent;
         ctx.beginPath();
         ctx.arc(hazard.x, hazard.y, hazard.radius, 0, Math.PI * 2);
         ctx.fill();
@@ -1381,9 +1533,9 @@ export default function BossEncounter({
         ctx.fill();
       });
 
-      // 5. Player Shots Rendering (radius === 5)
+      // 5. Player Shots (radius === 5)
       state.shots.forEach((shot) => {
-        ctx.fillStyle = state.activePowerup?.type === "spread" ? "#38bdf8" : "#ffdf73";
+        ctx.fillStyle = shot.color || "#ffdf73";
         ctx.beginPath();
         ctx.arc(shot.x, shot.y, 5, 0, Math.PI * 2);
         ctx.fill();
@@ -1394,34 +1546,23 @@ export default function BossEncounter({
         ctx.fill();
       });
 
-      // 6. Player and Squad Companions Rendering
+      // 6. Squad Companions & Player Swimmer Rendering
       const avatarImg = images.current.avatar;
 
-      // Render Squad Companions
-      state.companions.forEach((comp) => {
-        const compX = state.x + comp.offsetX;
-        const compY = state.y + comp.offsetY;
-        // Shadow under companion
-        ctx.fillStyle = "rgba(0, 0, 0, 0.25)";
-        ctx.beginPath();
-        ctx.ellipse(compX, compY + 24, 18, 7, 0, 0, Math.PI * 2);
-        ctx.fill();
-
+      for (const player of lobbyRef.current?.players || []) {
+        if (player.self || !player.alive) continue;
         if (avatarImg?.complete && avatarImg.naturalWidth) {
-          const [sx, sy] = portraits[comp.avatarId] || portraits.fern;
-          ctx.drawImage(avatarImg, sx, sy, 275, 415, compX - 24, compY - 45, 48, 72);
+          const [sx, sy] = portraits[player.avatarId] || portraits.fern;
+          ctx.drawImage(avatarImg, sx, sy, 275, 415, player.x - 24, player.y - 45, 48, 72);
         }
-
-        // Companion name tag
-        ctx.font = "800 10px system-ui";
+        ctx.font = "700 12px system-ui";
         ctx.textAlign = "center";
-        ctx.fillStyle = comp.accent;
-        ctx.fillText(comp.name, compX, compY + 36);
-      });
+        ctx.fillStyle = "#103d41";
+        ctx.fillText(player.name, player.x, player.y + 40);
+      }
 
-      // Player Swimmer Rendering
+      // Player Swimmer
       if (state.invulnerable <= 0 || Math.floor(state.invulnerable * 8) % 2 === 0) {
-        // Shadow under swimmer
         ctx.fillStyle = "rgba(0, 0, 0, 0.25)";
         ctx.beginPath();
         ctx.ellipse(state.x, state.y + 26, 22, 8, 0, 0, Math.PI * 2);
@@ -1432,7 +1573,6 @@ export default function BossEncounter({
           ctx.drawImage(avatarImg, sx, sy, 275, 415, state.x - 27, state.y - 50, 54, 80);
         }
 
-        // Active Bubble Shield Forcefield
         if (state.activePowerup?.type === "shield") {
           ctx.strokeStyle = `rgba(96, 165, 250, ${0.7 + Math.sin(state.animTimer * 10) * 0.25})`;
           ctx.lineWidth = 3;
@@ -1446,6 +1586,17 @@ export default function BossEncounter({
           ctx.fill();
         }
       }
+
+      // Aim guide makes the selected firing direction visible on touch and desktop.
+      ctx.save();
+      ctx.strokeStyle = "#f9d779";
+      ctx.lineWidth = 3;
+      ctx.setLineDash([6, 5]);
+      ctx.beginPath();
+      ctx.moveTo(state.x + controls.current.aimX * 32, state.y + controls.current.aimY * 32);
+      ctx.lineTo(state.x + controls.current.aimX * 82, state.y + controls.current.aimY * 82);
+      ctx.stroke();
+      ctx.restore();
 
       // 7. Particles
       state.particles.forEach((p) => {
@@ -1469,7 +1620,7 @@ export default function BossEncounter({
       });
       ctx.globalAlpha = 1;
 
-      // 9. Non-intrusive Top Alert Ribbon (does not cover boss or player graphics)
+      // 9. Alert Ribbon
       if (state.banner) {
         const progress = state.banner.timer / state.banner.maxTimer;
         const bannerAlpha = Math.min(1, progress * 3);
@@ -1495,16 +1646,20 @@ export default function BossEncounter({
 
       ctx.restore();
 
-      // Update React HUD periodically without excessive renders
+      // Periodically update React HUD
       if (now - displayAt > 100) {
         displayAt = now;
         setHud({
-          hp: state.hp,
+          hp: Math.round(state.hp),
           stage: state.stage,
           squadCount: state.squadCount,
         });
         setDashReady(state.dashCooldown <= 0);
         setActivePowerupUi(state.activePowerup ? `${state.activePowerup.type} (${Math.ceil(state.activePowerup.timer)}s)` : null);
+
+        const m = Math.floor(state.battleTimer / 60);
+        const s = Math.floor(state.battleTimer % 60);
+        setBattleTimeStr(`${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`);
       }
 
       frame = requestAnimationFrame(render);
@@ -1512,32 +1667,25 @@ export default function BossEncounter({
 
     frame = requestAnimationFrame(render);
     return () => cancelAnimationFrame(frame);
-  }, [phase, game.me.avatarId, finish, opponent]);
+  }, [phase, game.me.avatarId, finish, opponent, dialogueOpen]);
 
-  function start() {
-    const freshBattle = fresh(squadCount);
+  async function start() {
+    if (lobbyRef.current) {
+      if (!lobbyRef.current.host || lobbyBusy) return;
+      setLobbyBusy(true);
+      try { rememberLobby(await lobbyRequest(game.room.id, "start")); }
+      catch (error) { setLobbyError(error instanceof Error ? error.message : "Could not start the fight."); }
+      finally { setLobbyBusy(false); }
+      return;
+    }
+    const freshBattle = fresh(1, opponent);
     freshBattle.phase = "playing";
     battle.current = freshBattle;
     setResults(null);
-    setHud({ hp: 100, stage: "human", squadCount });
+    setHud({ hp: 100, stage: "human", squadCount: 1 });
     setPhase("playing");
-    if (squadCount >= 3) {
-      freshBattle.banner = {
-        text: "3-MAN SQUAD LINKED",
-        subtext: "Boss Void Shield shattered! Combined firepower active!",
-        color: "#38bdf8",
-        timer: 2.2,
-        maxTimer: 2.2,
-      };
-    } else {
-      freshBattle.banner = {
-        text: "INSUFFICIENT CREW",
-        subtext: "Boss Void Shield active! 3 swimmers required to pierce!",
-        color: "#f87171",
-        timer: 2.5,
-        maxTimer: 2.5,
-      };
-    }
+    setDialogueOpen(true);
+
     const orientation = screen.orientation as ScreenOrientation & {
       lock?: (orientation: string) => Promise<void>;
     };
@@ -1568,18 +1716,37 @@ export default function BossEncounter({
     setKnob({ x: 0, y: 0 });
   }
 
+  function moveAim(event: ReactPointerEvent<HTMLButtonElement>) {
+    if (aimPointer.current !== event.pointerId || !aimJoystick.current) return;
+    const box = aimJoystick.current.getBoundingClientRect();
+    const x = event.clientX - (box.left + box.width / 2);
+    const y = event.clientY - (box.top + box.height / 2);
+    const rotated = window.innerHeight > window.innerWidth;
+    const localX = rotated ? y : x, localY = rotated ? -x : y;
+    const length = Math.hypot(localX, localY);
+    if (length < 5) return;
+    controls.current.aimX = localX / length;
+    controls.current.aimY = localY / length;
+    const distance = Math.min(length, Math.min(box.width, box.height) * 0.32);
+    setAimKnob({ x: controls.current.aimX * distance, y: controls.current.aimY * distance });
+  }
+
+  const currentOpponentConfig = opponents[opponent];
+  const targetDurationMin = TARGET_RAID_DURATION_SECONDS[opponent] / 60;
+
   return (
     <section
       className="boss-screen"
-      aria-label={`${opponents[opponent].name} boss encounter`}
+      aria-label={`${currentOpponentConfig.name} boss encounter`}
       data-boss-phase={hud.stage}
     >
       <div className="boss-landscape">
-        {/* Top HUD: ONLY Player Health & Squad Counter are visible. Boss health is hidden. */}
+        {/* Top HUD: Tactical Status (Player Health & Squad Counter). Boss health is hidden per repo spec. */}
         <div className="boss-hud">
           <Link href="/" className="boss-back" aria-label="Leave boss fight">
             ← <span>Island</span>
           </Link>
+
           <div className="boss-health">
             <span>You</span>
             <div>
@@ -1587,25 +1754,33 @@ export default function BossEncounter({
             </div>
             <b>{hud.hp}</b>
           </div>
+
+          <div className="boss-timer" aria-label={`Raid timer: ${battleTimeStr}`}>
+            <Timer size={14} />
+            <span>{battleTimeStr}</span>
+          </div>
+
           <div
-            className="boss-timer boss-squad-badge"
+            className="boss-squad-badge"
             aria-label={`Raid squad: ${hud.squadCount} swimmers active`}
           >
             <Users size={14} />
-            <span>{hud.squadCount} SWIMMERS</span>
+            <span>{lobby && phase === "ready" ? lobby.players.length : hud.squadCount} {((lobby && phase === "ready" ? lobby.players.length : hud.squadCount) === 1) ? "SWIMMER" : "SWIMMERS"}</span>
           </div>
-          <div className="boss-name" style={{ color: opponents[opponent].accent }}>
-            {opponents[opponent].name}
-            <small>
+
+          <div className="boss-name-badge" style={{ color: currentOpponentConfig.accent }}>
+            <span>{currentOpponentConfig.name}</span>
+            <span className="boss-phase-tag">
               {hud.stage === "defeated"
                 ? "Defeated"
                 : hud.stage === "enraged"
-                ? "Enraged"
+                ? "Overdrive"
                 : hud.stage === "transformed"
-                ? "Transformed"
-                : "Encounter"}
-            </small>
+                ? "Phase 2"
+                : "Phase 1"}
+            </span>
           </div>
+
           <div className="boss-hud-actions">
             {activePowerupUi && (
               <span
@@ -1614,6 +1789,8 @@ export default function BossEncounter({
                     ? "spread"
                     : activePowerupUi.startsWith("shield")
                     ? "shield"
+                    : activePowerupUi.startsWith("heal")
+                    ? "heal"
                     : "speed"
                 }`}
               >
@@ -1621,12 +1798,15 @@ export default function BossEncounter({
                   <Zap size={12} />
                 ) : activePowerupUi.startsWith("shield") ? (
                   <Shield size={12} />
+                ) : activePowerupUi.startsWith("heal") ? (
+                  <Heart size={12} />
                 ) : (
                   <Sparkles size={12} />
                 )}
                 {activePowerupUi}
               </span>
             )}
+
             <button
               className="boss-sound-btn"
               onClick={toggleSound}
@@ -1650,78 +1830,71 @@ export default function BossEncounter({
           {phase !== "playing" && (
             <div className="boss-intro">
               <div className="boss-intro-card">
-                <span className="boss-kicker">3-PERSON RAID SQUAD · NO TIMER</span>
+                <span className="boss-kicker">
+                  BOSS ENCOUNTER · SOLO PRACTICE OR CREW RAID
+                </span>
+
+                {/* Boss Switcher Tabs */}
+                {phase === "ready" && (
+                  <div className="boss-opponents-picker" role="tablist">
+                    {(["kirkify", "diddy", "epstein"] as Opponent[]).map((oppKey) => {
+                      const cfg = opponents[oppKey];
+                      const active = opponent === oppKey;
+                      return (
+                        <button
+                          key={oppKey}
+                          type="button"
+                          className={`boss-opponent-tab ${active ? "active" : ""}`}
+                          onClick={() => { if (oppKey !== opponent) { setLoaded(false); setLoadError(false); setOpponent(oppKey); } }}
+                          disabled={!!lobby || lobbyBusy}
+                          role="tab"
+                          aria-selected={active}
+                        >
+                          <Swords size={13} />
+                          <span>{cfg.name}</span>
+                          <small>Day {cfg.day} · {cfg.targetMinutes}m</small>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
                 <h1>
                   {phase === "won"
-                    ? `You defeated ${opponents[opponent].name}!`
+                    ? `You defeated ${currentOpponentConfig.name}!`
                     : phase === "lost"
                     ? "The encounter ended"
-                    : `Face ${opponents[opponent].name}`}
+                    : `Face ${currentOpponentConfig.name}`}
                 </h1>
+
                 <p>
                   {phase === "won"
-                    ? `Your ${hud.squadCount}-man squad destroyed the boss and cleared the waters.`
+                    ? `You held on and defeated ${currentOpponentConfig.name}.`
                     : phase === "lost"
-                    ? `The boss overpowered your squad. Assemble at least 3 persons to break through.`
-                    : `Defeat ${opponents[opponent].name}. Boss void armor deflects solo attacks and requires at least 3 swimmers to pierce!`}
+                    ? "The encounter ended. Try again when you’re ready."
+                    : "Dodge attacks, aim your shots and survive the encounter."}
                 </p>
 
                 {phase === "ready" && (
-                  <div className="boss-squad-config">
-                    <div className="boss-squad-selector">
-                      <button
-                        type="button"
-                        className={`boss-squad-btn ${squadCount === 1 ? "active" : ""}`}
-                        onClick={() => setSquadCount(1)}
-                      >
-                        1 Solo
-                      </button>
-                      <button
-                        type="button"
-                        className={`boss-squad-btn ${squadCount === 2 ? "active" : ""}`}
-                        onClick={() => setSquadCount(2)}
-                      >
-                        2 Duo
-                      </button>
-                      <button
-                        type="button"
-                        className={`boss-squad-btn ${squadCount === 3 ? "active" : ""}`}
-                        onClick={() => setSquadCount(3)}
-                      >
-                        3 Squad (Required)
-                      </button>
-                    </div>
-
-                    <div className="boss-squad-preview">
-                      <span className="boss-squad-member-chip">
-                        🏊 <b>You</b> (Lead)
-                      </span>
-                      {squadCount >= 2 && (
-                        <span className="boss-squad-member-chip">
-                          🌊 <b>Kai</b> (Vanguard)
-                        </span>
-                      )}
-                      {squadCount >= 3 && (
-                        <span className="boss-squad-member-chip">
-                          ⚡ <b>Maya</b> (Gunner)
-                        </span>
-                      )}
-                    </div>
-
-                    {squadCount < 3 ? (
-                      <div className="boss-squad-warning">
-                        ⚠️ Void Shield Active: Deflects 93% damage unless attacked by at least 3 persons!
-                      </div>
-                    ) : (
-                      <div className="boss-squad-success">
-                        ✓ 3-swimmer formation ready: Boss Void Shield will be shattered!
-                      </div>
-                    )}
-                  </div>
+                  <>
+                    <div className="boss-brief"><span><Timer size={16} /> {targetDurationMin}-minute encounter</span><span><Shield size={16} /> Endurance shield</span></div>
+                    <p className="boss-endurance-note">The shield prevents a knockout before {targetDurationMin} minutes. Boss health increases for each player in the lobby.</p>
+                    {lobby ? <section className="raid-lobby" aria-label="Crew lobby">
+                      <div className="raid-lobby-heading"><strong><Users size={17} /> Crew lobby</strong><span>{lobby.players.length} joined</span></div>
+                      <div className="raid-lobby-players">{lobby.players.map(player => <div className="raid-lobby-player" key={player.id}><PlayerAvatar avatarId={player.avatarId} accent={player.avatarAccent} size={34} /><span>{player.self ? "You" : player.name}</span></div>)}</div>
+                      <p>{lobby.host ? "Wait for your crew, then start when everyone is ready." : "Waiting for the host to start."}</p>
+                      <button className="raid-leave" onClick={() => void leaveLobby()} disabled={lobbyBusy}>Leave lobby</button>
+                    </section> : game.mode === "online" && game.room.id ? <button className="raid-join" onClick={() => void enterLobby()} disabled={lobbyBusy}><Users size={17} /> Join or create crew lobby</button> : <p className="boss-endurance-note">Solo practice is on this device. Sign in and join a crew room to play together.</p>}
+                    {lobbyError && <p className="boss-error" role="alert">{lobbyError}</p>}
+                  </>
                 )}
 
                 {results && (
                   <div className="boss-results" aria-label="Encounter summary">
+                    <div>
+                      <strong>{results.durationStr}</strong>
+                      <span>Fight Duration</span>
+                    </div>
                     <div>
                       <strong>{results.squadCount}</strong>
                       <span>Swimmers in squad</span>
@@ -1739,19 +1912,25 @@ export default function BossEncounter({
                   </div>
                 )}
 
-                <p className="boss-small">This raid encounter requires at least 3 persons to pierce the boss's void barrier.</p>
+                <p className="boss-small">Move, aim, hold attack and dash to dodge.</p>
 
                 {loadError ? (
                   <p className="boss-error">
                     The sprite sheets could not load. Reconnect and reload this page.
                   </p>
+                ) : lobby && phase !== "ready" ? (
+                  <button className="boss-start" onClick={() => void leaveLobby()} disabled={lobbyBusy}>Leave crew raid</button>
                 ) : (
-                  <button className="boss-start" onClick={start} disabled={!loaded}>
-                    {!loaded ? "Loading sprites…" : phase === "ready" ? (squadCount >= 3 ? "Start 3-Person Raid" : "Start Battle") : "Try again"}
+                  <button className="boss-start" onClick={() => void start()} disabled={!loaded || lobbyBusy || (!!lobby && !lobby.host)}>
+                    {!loaded
+                      ? "Loading sprites…"
+                      : phase === "ready"
+                      ? lobby ? lobby.host ? "Start crew raid" : "Waiting for host" : "Start solo practice"
+                      : "Try again"}
                   </button>
                 )}
 
-                <Link href="/" className="boss-exit">
+                <Link href="/" className="boss-exit" onClick={() => { if (lobbyRef.current) void lobbyRequest(game.room.id, "leave").catch(() => {}); }}>
                   Back to island
                 </Link>
               </div>
@@ -1779,8 +1958,18 @@ export default function BossEncounter({
 
               <div className="boss-actions-cluster">
                 <button
+                  ref={aimJoystick}
+                  className="boss-aim"
+                  aria-label="Aim and fire joystick. Keyboard: I J K L"
+                  onPointerDown={event => { event.currentTarget.setPointerCapture(event.pointerId); aimPointer.current = event.pointerId; controls.current.attack = true; moveAim(event); }}
+                  onPointerMove={moveAim}
+                  onPointerUp={event => { if (aimPointer.current === event.pointerId) { aimPointer.current = null; controls.current.attack = false; setAimKnob({ x: 0, y: 0 }); } }}
+                  onPointerCancel={() => { aimPointer.current = null; controls.current.attack = false; setAimKnob({ x: 0, y: 0 }); }}
+                  onLostPointerCapture={() => { aimPointer.current = null; controls.current.attack = false; setAimKnob({ x: 0, y: 0 }); }}
+                ><span style={{ transform: `translate(${aimKnob.x}px, ${aimKnob.y}px)` }} /><small>AIM</small></button>
+                <button
                   className="boss-dash"
-                  aria-label="Dodge dash (Keyboard: Shift or K)"
+                  aria-label="Dodge dash (Keyboard: Shift)"
                   disabled={!dashReady}
                   onClick={triggerDash}
                 >
@@ -1815,10 +2004,15 @@ export default function BossEncounter({
               </div>
             </div>
           )}
+          {phase === "playing" && dialogueOpen && <div className="boss-dialogue" role="dialog" aria-modal="true" aria-labelledby="boss-dialogue-name">
+            <div className="boss-dialogue-art"><DialoguePortrait opponent={opponent} /></div>
+            <div className="boss-dialogue-box"><strong id="boss-dialogue-name">{currentOpponentConfig.name.toUpperCase()}</strong><p>{opponent === "kirkify" ? "You think you can make it past me?" : opponent === "diddy" ? "The tide turns against you here." : "There is no easy way off this island."}</p><button onClick={() => setDialogueOpen(false)} autoFocus>Let&apos;s fight <Swords size={15} aria-hidden="true" /></button></div>
+          </div>}
+          {phase === "playing" && lobbyError && <p className="raid-connection" role="status">{lobbyError}</p>}
         </div>
 
         <p className="boss-rotate-hint">
-          Rotate your phone for a wider view · Keyboard: WASD to move, Space to shoot, Shift to dash
+          Rotate your phone for a wider view · WASD to move, IJKL to aim, Space to attack, Shift to dash
         </p>
       </div>
     </section>
