@@ -51,12 +51,11 @@ Reminder times alone do not grant notification permission. Players opt in under 
 ## Set up Neon and Render
 
 1. Create a Neon project and obtain its pooled PostgreSQL URL.
-2. Connect the repository to Render using the root `render.yaml` Blueprint. It defines the Next.js web service and a separate scheduled worker. The web service runs the idempotent database migration before deployment.
-3. Set `DATABASE_URL` on both services to the same private Neon URL.
-4. For optional push reminders, generate keys with `corepack pnpm@10.30.3 push:keys`. Set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT` on both Render services. Use a real contact address in `VAPID_SUBJECT`; keep the private key out of source and chat.
-5. Open the deployed app, create an account, and choose a reminder under **Settings**. Enable background reminders separately on each device.
-
-The Blueprint also defines a keep-alive cron that requests the web service every 14 minutes. Set its `WEB_URL` to the service's HTTPS `onrender.com` URL in Render. This is useful only for a Free web service, which otherwise spins down after 15 minutes without inbound traffic. Render cron jobs have a $1/month minimum charge; a paid web service does not need this ping.
+2. Connect the repository to Render using the root `render.yaml` Blueprint. It creates one Free Next.js web service and applies database migrations when the app starts.
+3. Set `DATABASE_URL` on the Render web service and as a GitHub Actions repository secret with the same Neon URL. In GitHub repository settings, also set the `SCHEDULED_SWEEP_ENABLED` Actions variable to `true` to enable the hourly game sweep. Until then, no recurring GitHub job runs. The hourly schedule can delay missed-day processing and reminders by up to about an hour.
+4. On Render Free, the web service sleeps after 15 minutes without inbound traffic; the first visit after sleep can take about a minute to wake it. There is no paid keep-alive service.
+5. For optional push reminders, generate VAPID keys with `corepack pnpm@10.30.3 push:keys`. Add `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` to the Render web service and all three values (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`) as GitHub Actions secrets. Use a real contact address for `VAPID_SUBJECT`; keep private keys out of source and chat.
+6. Open the deployed app, create an account, and choose a reminder under **Settings**. Enable background reminders separately on each device.
 
 Without VAPID keys, check-ins and scheduled elimination still work. A saved reminder preference does not send a background notification until the owner configures VAPID and the player grants permission.
 
@@ -75,7 +74,6 @@ Without VAPID keys, check-ins and scheduled elimination still work. A saved remi
 | `corepack pnpm@10.30.3 exec tsc --noEmit` | Check TypeScript types. |
 | `corepack pnpm@10.30.3 db:migrate` | Apply the Neon schema. |
 | `corepack pnpm@10.30.3 sweep` | Process missed days, winners, and opted-in reminders. |
-| `corepack pnpm@10.30.3 keepalive` | Request the configured `WEB_URL`; used by Render's 14-minute keep-alive cron. |
 
 The browser check needs Chrome launched with `--remote-debugging-port=9223` and a separate `--user-data-dir`. It uses isolated test storage and intercepts its authentication failure request, so it creates no real accounts. Set `APP_URL` to the preview origin; set `UI_CHECK_PWA=1` to check offline navigation against a production build. Captures are written to `../.impeccable/review/`.
 

@@ -12,8 +12,7 @@
                     "ui:check": "node scripts/ui-check.mjs",
                     "db:migrate":  "node scripts/migrate.mjs",
                     "push:keys":  "node scripts/generate-vapid.mjs",
-                    "sweep":  "node scripts/sweep.mjs",
-                    "keepalive": "node scripts/ping-render.mjs"
+                    "sweep":  "node scripts/sweep.mjs"
                 },
     "dependencies":  {
                          "next":  "16.3.4",

@@ -1,0 +1,41 @@
+name: Scheduled game sweep
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sweep:
+    if: ${{ vars.SCHEDULED_SWEEP_ENABLED == 'true' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: web
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+      VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+      VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.30.3
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run game sweep
+        run: pnpm sweep

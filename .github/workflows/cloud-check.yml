@@ -65,6 +65,9 @@ jobs:
           pnpm db:migrate
           pnpm db:migrate
 
+      - name: Check scheduled game sweep
+        run: pnpm sweep
+
       - name: Install Chrome
         id: chrome
         uses: browser-actions/setup-chrome@v2

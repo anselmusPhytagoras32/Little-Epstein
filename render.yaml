@@ -2,48 +2,11 @@ services:
   - type: web
     name: escape-the-epstein
     runtime: node
-    plan: starter
+    plan: free
     rootDir: web
     buildCommand: corepack pnpm@10.30.3 install --frozen-lockfile && corepack pnpm@10.30.3 build
-    preDeployCommand: corepack pnpm@10.30.3 db:migrate
-    startCommand: corepack pnpm@10.30.3 start
+    startCommand: corepack pnpm@10.30.3 db:migrate && corepack pnpm@10.30.3 start
     healthCheckPath: /
     envVars:
       - key: DATABASE_URL
-        sync: false
-      - key: VAPID_PUBLIC_KEY
-        sync: false
-      - key: VAPID_PRIVATE_KEY
-        sync: false
-      - key: VAPID_SUBJECT
-        sync: false
-
-  - type: cron
-    name: escape-the-epstein-daily-game
-    runtime: node
-    plan: starter
-    rootDir: web
-    schedule: "*/5 * * * *"
-    buildCommand: corepack pnpm@10.30.3 install --frozen-lockfile
-    startCommand: corepack pnpm@10.30.3 sweep
-    envVars:
-      - key: DATABASE_URL
-        sync: false
-      - key: VAPID_PUBLIC_KEY
-        sync: false
-      - key: VAPID_PRIVATE_KEY
-        sync: false
-      - key: VAPID_SUBJECT
-        sync: false
-
-  - type: cron
-    name: escape-the-epstein-keepalive
-    runtime: node
-    plan: starter
-    rootDir: web
-    schedule: "*/14 * * * *"
-    buildCommand: corepack pnpm@10.30.3 install --frozen-lockfile
-    startCommand: corepack pnpm@10.30.3 keepalive
-    envVars:
-      - key: WEB_URL
         sync: false
