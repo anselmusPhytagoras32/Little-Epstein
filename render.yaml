@@ -4,7 +4,7 @@ services:
     runtime: node
     plan: free
     rootDir: web
-    buildCommand: corepack pnpm@10.30.3 install --frozen-lockfile && corepack pnpm@10.30.3 build
+    buildCommand: corepack pnpm@10.30.3 install --frozen-lockfile --prod=false && corepack pnpm@10.30.3 build
     startCommand: corepack pnpm@10.30.3 db:migrate && corepack pnpm@10.30.3 start
     healthCheckPath: /
     envVars:
