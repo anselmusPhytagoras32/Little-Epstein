@@ -614,6 +614,8 @@ export default function BossEncounter({
   const battle = useRef<Battle>(fresh(1, initialOpponent));
   const controls = useRef({ x: 0, y: 0, aimX: 0, aimY: -1, attack: false, keys: new Set<string>() });
   const aimJoystick = useRef<HTMLButtonElement>(null);
+  const aimKnob = useRef<HTMLSpanElement>(null);
+  const moveKnob = useRef<HTMLSpanElement>(null);
   const aimPointer = useRef<number | null>(null);
   const lobbyRef = useRef<BossLobby | null>(null);
   const raidDamage = useRef(0);
@@ -621,10 +623,9 @@ export default function BossEncounter({
   const [lobby, setLobby] = useState<BossLobby | null>(null);
   const [lobbyError, setLobbyError] = useState("");
   const [lobbyBusy, setLobbyBusy] = useState(false);
-  const [aimKnob, setAimKnob] = useState({ x: 0, y: 0 });
+  const remotePositions = useRef(new Map<string, { x: number; y: number }>());
   const [dialogueOpen, setDialogueOpen] = useState(false);
   const pointer = useRef<number | null>(null);
-  const [knob, setKnob] = useState({ x: 0, y: 0 });
   const [phase, setPhase] = useState<Phase>("ready");
   const [opponent, setOpponent] = useState<Opponent>(initialOpponent);
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -726,6 +727,8 @@ export default function BossEncounter({
 
   function rememberLobby(value: BossLobby | null) {
     lobbyRef.current = value;
+    const ids = new Set(value?.players.map(player => player.id) || []);
+    for (const id of remotePositions.current.keys()) if (!ids.has(id)) remotePositions.current.delete(id);
     setLobby(value);
   }
 
@@ -757,7 +760,8 @@ export default function BossEncounter({
       syncing.current = true;
       try {
         const state = battle.current;
-        const next = await lobbyRequest(game.room.id, "heartbeat", { x: state.x, y: state.y, bossX: state.bossX, bossY: state.bossY, alive: phase !== "lost", damageTotal: raidDamage.current });
+        const input = controls.current;
+        const next = await lobbyRequest(game.room.id, "heartbeat", { x: state.x, y: state.y, bossX: state.bossX, bossY: state.bossY, alive: phase !== "lost", damageTotal: raidDamage.current, attacking: phase === "playing" && !dialogueOpen && (input.attack || input.keys.has(" ")), aimX: input.aimX, aimY: input.aimY });
         if (cancelled || !next) return;
         rememberLobby(next);
         setLobbyError("");
@@ -774,6 +778,7 @@ export default function BossEncounter({
           setDialogueOpen(true);
           setPhase("playing");
         } else if (next.phase === "playing" && phase === "playing") {
+          if (next.hp < state.bossHp) state.bossFlashTimer = 0.12;
           state.bossHp = next.hp;
           state.maxBossHp = next.maxHp;
         } else if (next.phase === "won" && phase === "playing") {
@@ -784,9 +789,9 @@ export default function BossEncounter({
       finally { syncing.current = false; }
     };
     void update();
-    const timer = window.setInterval(update, 1500);
+    const timer = window.setInterval(update, 1000);
     return () => { cancelled = true; window.clearInterval(timer); };
-  }, [hasLobby, game.room.id, phase, finish]);
+  }, [hasLobby, game.room.id, phase, finish, dialogueOpen]);
 
   useEffect(() => () => { screen.orientation?.unlock?.(); }, []);
 
@@ -863,7 +868,9 @@ export default function BossEncounter({
       controls.current.y = 0;
       controls.current.attack = false;
       pointer.current = null;
-      setKnob({ x: 0, y: 0 });
+      if (moveKnob.current) moveKnob.current.style.transform = "translate(0px, 0px)";
+      if (aimKnob.current) aimKnob.current.style.transform = "translate(0px, 0px)";
+      aimPointer.current = null;
     };
     window.addEventListener("keydown", down);
     window.addEventListener("keyup", up);
@@ -1738,14 +1745,29 @@ export default function BossEncounter({
 
       for (const player of lobbyRef.current?.players || []) {
         if (player.self || !player.alive) continue;
+        let position = remotePositions.current.get(player.id);
+        if (!position) { position = { x: player.x, y: player.y }; remotePositions.current.set(player.id, position); }
+        const blend = 1 - Math.exp(-dt * 8);
+        position.x += (player.x - position.x) * blend;
+        position.y += (player.y - position.y) * blend;
+        if (player.attacking) {
+          // Cosmetic tracers follow the reported aim. Damage remains server-backed.
+          ctx.fillStyle = "#bfe5cf";
+          for (let i = 0; i < 3; i++) {
+            const distance = 32 + ((state.animTimer * 600 + i * 70) % 210);
+            ctx.beginPath();
+            ctx.arc(position.x + player.aimX * distance, position.y + player.aimY * distance, 4, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
         if (avatarImg?.complete && avatarImg.naturalWidth) {
           const [sx, sy] = portraits[player.avatarId] || portraits.fern;
-          ctx.drawImage(avatarImg, sx, sy, 275, 415, player.x - 24, player.y - 45, 48, 72);
+          ctx.drawImage(avatarImg, sx, sy, 275, 415, position.x - 24, position.y - 45, 48, 72);
         }
         ctx.font = "700 12px system-ui";
         ctx.textAlign = "center";
         ctx.fillStyle = "#103d41";
-        ctx.fillText(player.name, player.x, player.y + 40);
+        ctx.fillText(player.name, position.x, position.y + 40);
       }
 
       // Player Swimmer
@@ -1836,11 +1858,8 @@ export default function BossEncounter({
       // Periodically update React HUD
       if (now - displayAt > 100) {
         displayAt = now;
-        setHud({
-          hp: Math.round(state.hp),
-          stage: state.stage,
-          squadCount: state.squadCount,
-        });
+        setHud(previous => previous.hp === Math.round(state.hp) && previous.stage === state.stage && previous.squadCount === state.squadCount
+          ? previous : { hp: Math.round(state.hp), stage: state.stage, squadCount: state.squadCount });
         setDashReady(state.dashCooldown <= 0);
         setActivePowerupUi(state.activePowerup ? `${state.activePowerup.type} (${Math.ceil(state.activePowerup.timer)}s)` : null);
 
@@ -1892,7 +1911,7 @@ export default function BossEncounter({
     const scale = length > radius ? radius / length : 1;
     controls.current.x = (localX * scale) / radius;
     controls.current.y = (localY * scale) / radius;
-    setKnob({ x: localX * scale, y: localY * scale });
+    if (moveKnob.current) moveKnob.current.style.transform = `translate(${localX * scale}px, ${localY * scale}px)`;
   }
 
   function releaseJoystick(event: ReactPointerEvent<HTMLButtonElement>) {
@@ -1900,7 +1919,7 @@ export default function BossEncounter({
     pointer.current = null;
     controls.current.x = 0;
     controls.current.y = 0;
-    setKnob({ x: 0, y: 0 });
+    if (moveKnob.current) moveKnob.current.style.transform = "translate(0px, 0px)";
   }
 
   function moveAim(event: ReactPointerEvent<HTMLButtonElement>) {
@@ -1915,7 +1934,7 @@ export default function BossEncounter({
     controls.current.aimX = localX / length;
     controls.current.aimY = localY / length;
     const distance = Math.min(length, Math.min(box.width, box.height) * 0.32);
-    setAimKnob({ x: controls.current.aimX * distance, y: controls.current.aimY * distance });
+    if (aimKnob.current) aimKnob.current.style.transform = `translate(${controls.current.aimX * distance}px, ${controls.current.aimY * distance}px)`;
   }
 
   const currentOpponentConfig = opponents[opponent];
@@ -2228,7 +2247,7 @@ export default function BossEncounter({
                 onPointerCancel={releaseJoystick}
                 onLostPointerCapture={releaseJoystick}
               >
-                <span style={{ transform: `translate(${knob.x}px, ${knob.y}px)` }} />
+                <span ref={moveKnob} />
               </button>
 
               <div className="boss-actions-cluster">
@@ -2238,10 +2257,10 @@ export default function BossEncounter({
                   aria-label="Aim and fire joystick. Keyboard: I J K L"
                   onPointerDown={event => { event.currentTarget.setPointerCapture(event.pointerId); aimPointer.current = event.pointerId; controls.current.attack = true; moveAim(event); }}
                   onPointerMove={moveAim}
-                  onPointerUp={event => { if (aimPointer.current === event.pointerId) { aimPointer.current = null; controls.current.attack = false; setAimKnob({ x: 0, y: 0 }); } }}
-                  onPointerCancel={() => { aimPointer.current = null; controls.current.attack = false; setAimKnob({ x: 0, y: 0 }); }}
-                  onLostPointerCapture={() => { aimPointer.current = null; controls.current.attack = false; setAimKnob({ x: 0, y: 0 }); }}
-                ><span style={{ transform: `translate(${aimKnob.x}px, ${aimKnob.y}px)` }} /><small>AIM</small></button>
+                  onPointerUp={event => { if (aimPointer.current === event.pointerId) { aimPointer.current = null; controls.current.attack = false; if (aimKnob.current) aimKnob.current.style.transform = "translate(0px, 0px)"; } }}
+                  onPointerCancel={event => { if (aimPointer.current === event.pointerId) { aimPointer.current = null; controls.current.attack = false; if (aimKnob.current) aimKnob.current.style.transform = "translate(0px, 0px)"; } }}
+                  onLostPointerCapture={event => { if (aimPointer.current === event.pointerId) { aimPointer.current = null; controls.current.attack = false; if (aimKnob.current) aimKnob.current.style.transform = "translate(0px, 0px)"; } }}
+                ><span ref={aimKnob} /><small>AIM</small></button>
                 <button
                   className="boss-dash"
                   aria-label="Dodge dash (Keyboard: Shift)"

@@ -143,7 +143,9 @@ jobs:
           node scripts/swim-check.mjs
 
       - name: Check boss fight
-        run: node scripts/boss-check.mjs
+        run: |
+          node scripts/boss-check.mjs
+          node scripts/boss-crew-check.mjs
 
       - name: Check authenticated multiplayer lobby against PostgreSQL
         run: node scripts/boss-lobby-check.mjs

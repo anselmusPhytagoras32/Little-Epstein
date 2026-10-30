@@ -122,12 +122,12 @@ async function bossRoomAccess(roomId: string, playerId: string) {
 async function bossSnapshot(roomId: string, playerId: string) {
   const raid = await database().query<{host_id:string; opponent:string; phase:string; hp:number; max_hp:number; boss_x:number; boss_y:number; started_at:Date|null}>(`SELECT host_id, opponent, phase, hp, max_hp, boss_x, boss_y, started_at FROM boss_raids WHERE room_id=$1`, [roomId]);
   if (!raid.rowCount) return null;
-  const members = await database().query<{id:string;name:string;avatar_id:string;avatar_accent:string;x:number;y:number;alive:boolean;damage_total:number;self:boolean}>(
-    `SELECT p.id,p.username AS name,p.avatar_id,p.avatar_accent,b.x,b.y,b.alive,b.damage_total,(p.id=$2) AS self
+  const members = await database().query<{id:string;name:string;avatar_id:string;avatar_accent:string;x:number;y:number;alive:boolean;attacking:boolean;aim_x:number;aim_y:number;damage_total:number;self:boolean}>(
+    `SELECT p.id,p.username AS name,p.avatar_id,p.avatar_accent,b.x,b.y,b.alive,(b.attacking AND b.last_seen > now()-interval '3 seconds') AS attacking,b.aim_x,b.aim_y,b.damage_total,(p.id=$2) AS self
      FROM boss_raid_players b JOIN players p ON p.id=b.player_id
      WHERE b.room_id=$1 AND b.last_seen > now()-interval '20 seconds' ORDER BY b.joined_at,p.id`, [roomId, playerId]);
   const row = raid.rows[0];
-  return { opponent:row.opponent, phase:row.phase, hp:row.hp, maxHp:row.max_hp, bossX:row.boss_x, bossY:row.boss_y, startedAt:row.started_at, host:row.host_id===playerId, players:members.rows.map(p => ({id:p.id,name:p.name,avatarId:p.avatar_id,avatarAccent:p.avatar_accent,x:p.x,y:p.y,alive:p.alive,damageTotal:p.self?p.damage_total:undefined,self:p.self})) };
+  return { opponent:row.opponent, phase:row.phase, hp:row.hp, maxHp:row.max_hp, bossX:row.boss_x, bossY:row.boss_y, startedAt:row.started_at, host:row.host_id===playerId, players:members.rows.map(p => ({id:p.id,name:p.name,avatarId:p.avatar_id,avatarAccent:p.avatar_accent,x:p.x,y:p.y,alive:p.alive,attacking:p.alive && p.attacking,aimX:p.aim_x,aimY:p.aim_y,damageTotal:p.self?p.damage_total:undefined,self:p.self})) };
 }
 
 async function bossAction(roomId: string, user: AuthedPlayer, data: Record<string, unknown>) {
@@ -178,7 +178,9 @@ async function bossAction(roomId: string, user: AuthedPlayer, data: Record<strin
         const elapsed = Math.max(0, (Date.now() - new Date(member.rows[0].last_seen).getTime()) / 1000);
         const accepted = member.rows[0].alive ? Math.min(reported - oldTotal, Math.ceil(250 * Math.min(10, elapsed + 1))) : 0;
         const alive = member.rows[0].alive && data.alive !== false;
-        await client.query(`UPDATE boss_raid_players SET x=$3,y=$4,alive=$5,damage_total=$6,last_seen=now() WHERE room_id=$1 AND player_id=$2`, [roomId,user.id,finite(data.x,0,960,480),finite(data.y,0,540,440),alive,oldTotal + accepted]);
+        const aimX = finite(data.aimX, -1, 1, 0), aimY = finite(data.aimY, -1, 1, -1);
+        const aimLength = Math.hypot(aimX, aimY);
+        await client.query(`UPDATE boss_raid_players SET x=$3,y=$4,alive=$5,damage_total=$6,attacking=$7,aim_x=$8,aim_y=$9,last_seen=now() WHERE room_id=$1 AND player_id=$2`, [roomId,user.id,finite(data.x,0,960,480),finite(data.y,0,540,440),alive,oldTotal + accepted,raid.phase === "playing" && alive && data.attacking === true,aimLength > 0.01 ? aimX / aimLength : 0,aimLength > 0.01 ? aimY / aimLength : -1]);
         if (raid.phase === "playing" && raid.host_id === user.id && alive) await client.query(`UPDATE boss_raids SET boss_x=$2,boss_y=$3 WHERE room_id=$1`, [roomId,finite(data.bossX,0,960,480),finite(data.bossY,0,540,130)]);
         if (raid.phase === "playing" && raid.started_at && accepted > 0) {
           const seconds = Math.max(0, (Date.now() - new Date(raid.started_at).getTime()) / 1000);

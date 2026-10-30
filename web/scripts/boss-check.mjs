@@ -134,6 +134,8 @@ try {
     verify(await evaluate("!document.querySelector('.boss-health.enemy') && !/boss (health|damage)|boss hp/i.test(document.querySelector('.boss-hud').textContent)"), `${name} boss health remains hidden during play`);
 
     if (id !== "kirkify") continue;
+    const frameTiming = await evaluate(`new Promise(resolve => {const deltas=[];let last;function frame(now){if(last!==undefined)deltas.push(now-last);last=now;if(deltas.length<120)requestAnimationFrame(frame);else{deltas.sort((a,b)=>a-b);resolve({median:deltas[60],p95:deltas[114],max:deltas[119]})}}requestAnimationFrame(frame)})`);
+    console.log("Boss frame timing (ms, idle, emulated Chromium):", JSON.stringify(frameTiming));
     const squadBadgeText = await evaluate("document.querySelector('.boss-squad-badge')?.textContent");
     verify(squadBadgeText?.includes("1 SWIMMER"), "The squad badge confirms solo practice");
     verify(await evaluate("!!document.querySelector('.boss-aim')"), "The aim control is available");
