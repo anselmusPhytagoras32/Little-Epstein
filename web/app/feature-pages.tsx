@@ -6,7 +6,7 @@ import { type FormEvent, type ReactNode, useRef, useState } from "react";
 import {
   ArrowRight, Bell, CalendarDays, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Copy,
   Download, Flame, Flag, Heart, LockKeyhole, LogOut, MapPin, Plus,
-  ShieldCheck, Sparkles, Trophy, UserRound, UsersRound,
+  ShieldCheck, Trophy, UserRound, UsersRound,
 } from "lucide-react";
 import { useGame } from "./game-provider";
 import { ROOM_LIMIT } from "../lib/game-rules";

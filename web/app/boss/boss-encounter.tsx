@@ -1927,7 +1927,7 @@ export default function BossEncounter({
       aria-label={`${currentOpponentConfig.name} boss encounter`}
       data-boss-phase={hud.stage}
     >
-      <div className="boss-landscape">
+      <div className={`boss-landscape${phase === "playing" ? " is-playing" : ""}`}>
         {/* Top HUD: Tactical Status (Player Health & Squad Counter). Boss health is hidden per repo spec. */}
         <div className="boss-hud">
           <Link href="/" className="boss-back" aria-label="Leave boss fight">
@@ -2246,7 +2246,8 @@ export default function BossEncounter({
                   className="boss-dash"
                   aria-label="Dodge dash (Keyboard: Shift)"
                   disabled={!dashReady}
-                  onClick={triggerDash}
+                  onPointerDown={(event) => { event.preventDefault(); triggerDash(); }}
+                  onClick={(event) => { if (event.detail === 0) triggerDash(); }}
                 >
                   DASH
                 </button>

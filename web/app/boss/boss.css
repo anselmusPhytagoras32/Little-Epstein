@@ -1572,3 +1572,33 @@
 .boss-attack { background: #f9d779; border-color: #765a20; color: #103d41; box-shadow: 0 4px 0 #a17a2d; }
 .raid-connection { position: absolute; top: 8px; left: 8px; z-index: 30; padding: 8px; border-radius: 8px; background: #fca47c; color: #422819; font-size: 12px; }
 @media (max-height: 480px) { .boss-actions-cluster { gap: 7px; } }
+
+/* Keep the arena clear and put independent controls under each thumb. */
+@media (pointer: coarse) {
+  .boss-controls { left: 16px; right: 16px; bottom: 14px; }
+  .boss-actions-cluster {
+    flex-direction: column-reverse;
+    align-items: center;
+    gap: 12px;
+    pointer-events: none;
+  }
+  .boss-joystick { width: clamp(88px, 13vw, 112px); }
+  .boss-aim { width: clamp(78px, 12vw, 100px); }
+  .boss-dash { width: 64px; }
+  /* Aiming already fires; the separate attack control remains for keyboard/mouse. */
+  .boss-attack { display: none; }
+  .boss-rotate-hint { display: none; }
+  .boss-landscape.is-playing .boss-name-badge { display: none; }
+  .boss-landscape.is-playing .boss-hud { gap: 8px; padding: 3px 8px; }
+  .boss-landscape.is-playing .boss-squad-badge { padding: 4px 7px; }
+}
+
+/* In the rotated portrait fallback, viewport width is the arena height. */
+@media (orientation: portrait) and (pointer: coarse) {
+  .boss-stage-body { grid-template-columns: minmax(90px, 150px) 1fr; gap: 12px; text-align: left; }
+  .boss-preview-pane { padding: 8px; }
+  .boss-tactical-badges { justify-content: flex-start; }
+  .boss-card-footer { flex-direction: row; }
+  .boss-intro-card { gap: 8px; padding: 10px 14px; }
+  .boss-playfield .boss-preview-pane .boss-dialogue-canvas { height: min(22vw, 100px); }
+}

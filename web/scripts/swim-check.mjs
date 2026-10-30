@@ -108,6 +108,7 @@ try {
   page.on("Runtime.exceptionThrown", event => exceptions.push(event.exceptionDetails.exception?.description || event.exceptionDetails.text));
   await page.send("Page.enable");
   await page.send("Runtime.enable");
+  await page.send("Page.addScriptToEvaluateOnNewDocument", { source: "localStorage.setItem('escape-onboarding-v1', 'done')" });
   await page.send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   await navigate("/", ".map-self-avatar .player-avatar");
   await waitFor("!!document.querySelector('.checkpoint-3d') && document.querySelectorAll('.route-dot').length > 0", "swimming route");
@@ -164,7 +165,7 @@ try {
   await sleep(400);
   await visibleClick(".boss-ambush-gate-btn.boss-gate-tumz");
   await waitFor("location.pathname === '/boss' && !!document.querySelector('.boss-start') && !document.querySelector('.boss-start').disabled", "Tumz gate opens the loaded boss screen");
-  verify(await evaluate("document.querySelector('.boss-squad-badge')?.textContent.includes('3 SWIMMERS')"), "Tumz gate opens the 3-swimmer raid encounter");
+  verify(await evaluate("document.querySelector('.boss-squad-badge')?.textContent.includes('1 SWIMMER')"), "The boss gate opens solo practice without invented players");
 
   // Test room and profile synchronization with synthetic responses only.
   let onlineAvatar = "fern";
@@ -196,13 +197,13 @@ try {
   });
   await page.send("Fetch.enable", { patterns: ["/api/session*", "/api/room/feed*", "/api/profile/avatar*"].map(pathname => ({ urlPattern: `${app.origin}${pathname}`, requestStage: "Request" })) });
   await navigate("/", ".escape-screen");
-  await waitFor("document.querySelectorAll('.map-crew-marker').length === 2 && !!document.querySelector('.crew-toggle')", "room markers load");
-  verify(await evaluate("!!document.querySelector('.map-crew-marker .avatar-scout.accent-coral') && !!document.querySelector('.map-crew-marker .avatar-chef.accent-sun') && document.querySelector('.map-crew-count').textContent === '+1'"), "Friends' selected avatars render, including grouped swimmers");
+  await waitFor("document.querySelectorAll('.checkpoint-crew-avatar').length === 3 && !!document.querySelector('.crew-toggle')", "room markers load");
+  verify(await evaluate("!!document.querySelector('.checkpoint-crew-avatar .avatar-scout.accent-coral') && !!document.querySelector('.checkpoint-crew-avatar .avatar-chef.accent-sun') && !!document.querySelector('.checkpoint-crew-stack .avatar-diver.accent-leaf')"), "Friends' selected avatars render at their checkpoints");
   await visibleClick(".crew-toggle");
   await waitFor("document.querySelectorAll('.crew-map-chip').length === 4", "room roster opens");
   await visibleClick(".crew-map-chip:nth-child(3)");
   await waitFor("document.querySelector('.player-detail h2')?.textContent === 'Kai'", "eliminated player details open");
-  verify(await evaluate("document.querySelector('.player-detail').textContent.includes('Caught') && document.querySelector('.player-detail').textContent.includes('2/30') && !!document.querySelector('.map-crew-marker.is-selected .avatar-diver.accent-leaf')"), "Selecting a grouped eliminated swimmer shows the correct avatar and saved progress");
+  verify(await evaluate("document.querySelector('.player-detail').textContent.includes('Caught') && document.querySelector('.player-detail').textContent.includes('2/30') && !!document.querySelector('.player-detail .avatar-diver.accent-leaf')"), "Selecting an eliminated swimmer shows the correct avatar and saved progress");
   await navigate("/settings", ".avatar-options");
   await waitFor("document.querySelector('input[name=avatar][value=fern]')?.checked", "online avatar settings load");
   await visibleClick(".avatar-option:has(input[value='builder'])");

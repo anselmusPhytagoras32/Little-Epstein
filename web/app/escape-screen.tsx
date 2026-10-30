@@ -4,13 +4,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Archive,
-  Camera,
   Check,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   ChevronUp,
-  CircleHelp,
   Clock3,
   Compass,
   Diamond,
@@ -79,31 +75,31 @@ export default function EscapeScreen() {
       ? game.me.name
       : "";
 
-  const [playerName, setPlayerName] = useState(() => {
-    if (currentAppUsername) return currentAppUsername;
+  const [certificateName, setCertificateName] = useState(() => {
+    if (currentAppUsername) return { name: currentAppUsername, username: currentAppUsername };
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("escape-certificate-custom-name");
-      if (saved && saved.trim() && saved !== "Survivor") return saved;
+      if (saved && saved.trim() && saved !== "Survivor") return { name: saved, username: currentAppUsername };
     }
-    return "Survivor";
+    return { name: "Survivor", username: currentAppUsername };
   });
+  const playerName = currentAppUsername && (certificateName.username !== currentAppUsername || !certificateName.name || certificateName.name === "Survivor")
+    ? currentAppUsername
+    : certificateName.name;
 
   // Automatically update when user's name changes in settings or room
   const prevUsernameRef = useRef(currentAppUsername);
   useEffect(() => {
     if (currentAppUsername && currentAppUsername !== prevUsernameRef.current) {
       prevUsernameRef.current = currentAppUsername;
-      setPlayerName(currentAppUsername);
       if (typeof window !== "undefined") {
         localStorage.setItem("escape-certificate-custom-name", currentAppUsername);
       }
-    } else if (currentAppUsername && (!playerName || playerName === "Survivor")) {
-      setPlayerName(currentAppUsername);
     }
-  }, [currentAppUsername, playerName]);
+  }, [currentAppUsername]);
 
   function handleNameChange(newName: string) {
-    setPlayerName(newName);
+    setCertificateName({ name: newName, username: currentAppUsername });
     if (typeof window !== "undefined") {
       localStorage.setItem("escape-certificate-custom-name", newName);
     }
@@ -482,7 +478,7 @@ export default function EscapeScreen() {
           <span>7-DAY STREAK</span>
         </div>
         <div className="streak-ribbon-days">
-          {weekDays.map((item, idx) => (
+          {weekDays.map((item) => (
             <div
               key={item.dateStr}
               className={`streak-day-cell ${item.isLogged ? "is-logged" : ""} ${item.isCurrent ? "is-current" : ""}`}

@@ -95,6 +95,7 @@ try {
   assert.deepEqual(result.result.value, { markers: 0, self: 1 }, 'solo practice shows only the real local player');
   await page.send('Page.navigate', { url: new URL('/crew', app).href });
   await waitFor(page, "!!document.querySelector('.crew-screen')", 'solo crew page');
+  await waitFor(page, "document.querySelector('.crew-screen')?.textContent.includes('solo practice') && document.querySelectorAll('.crew-roster .member-row').length === 1", 'practice crew finishes loading');
   result = await page.send('Runtime.evaluate', {
     expression: "({solo:document.querySelector('.crew-screen').textContent.includes('solo practice'),players:document.querySelectorAll('.crew-roster .member-row').length,names:/Kai|Maya|Leo|Zara/.test(document.querySelector('.crew-screen').textContent)})",
     returnByValue: true,

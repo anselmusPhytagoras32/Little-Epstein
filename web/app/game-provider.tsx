@@ -199,6 +199,7 @@ export function GameProvider({ initialNow, children }: { initialNow: string; chi
         if (previouslySignedIn) setNotice("Your session has expired. Sign in to reconnect with your crew.");
       } else {
         if (!authenticated.current) setMode("practice");
+        if (authenticated.current && error instanceof ApiError && error.status >= 500) setNotice("Your crew is temporarily unavailable. Your saved session is safe; try refreshing again.");
         if (error instanceof ApiError && error.status === 0) setOnline(false);
       }
     }
@@ -568,7 +569,7 @@ export function GameProvider({ initialNow, children }: { initialNow: string; chi
     setNotice(`The Gatekeeper ambush knocked your crew back (-${steps} checkpoint progress)!`);
   }, [mode]);
 
-  const restoreProgress = useCallback((steps = 1) => {
+  const restoreProgress = useCallback(() => {
     if (mode === "online") {
       setNotice("Revive activated! Lost crew ground recovered!");
       return;

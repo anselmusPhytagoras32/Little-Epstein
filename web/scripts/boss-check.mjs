@@ -145,7 +145,7 @@ try {
     await release(stick.x + stick.width * .35, stick.y);
     const movedX = await evaluate("window.__bossCheck.playerX");
     verify(movedX > initialX + 30, `The joystick moves the swimmer (${initialX} to ${movedX})`);
-    const attack = await rect(".boss-attack");
+    const attack = await rect(".boss-aim");
     await press(attack.x, attack.y);
     await waitFor("window.__bossCheck.shots > 0", "attack projectiles");
     await waitFor("window.__bossCheck.hazards > 0", "dodgeable boss projectiles");
@@ -164,6 +164,20 @@ try {
     const found = await evaluate(`(() => {const canvas=document.querySelector('canvas');const key=Object.keys(canvas).find(k=>k.startsWith('__reactFiber'));let fiber=key&&canvas[key];while(fiber){let hook=fiber.memoizedState;while(hook){const ref=hook.memoizedState;if(ref?.current&&typeof ref.current.bossHp==='number'&&Array.isArray(ref.current.shots)){window.__battleFixture=ref.current;return true}hook=hook.next}fiber=fiber.return}return false})()`);
     verify(found, "The isolated test can set up damage thresholds without a production hook");
     verify(await evaluate("window.__battleFixture.squadCount === 1"), "Solo practice does not invent teammates");
+    // A second finger must dash while the first finger keeps the movement stick held.
+    await page.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
+    verify(await evaluate("getComputedStyle(document.querySelector('.boss-attack')).display === 'none'"), "Touch layout uses the aim stick for firing");
+    await capture("boss-touch-playing.png");
+    const moveStick = await rect(".boss-joystick");
+    const dash = await rect(".boss-dash");
+    const movingFinger = { x: Math.round(moveStick.x + moveStick.width * .3), y: Math.round(moveStick.y), id: 1 };
+    const dashFinger = { x: Math.round(dash.x), y: Math.round(dash.y), id: 2 };
+    await page.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [movingFinger] });
+    await page.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [movingFinger, dashFinger] });
+    await page.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [movingFinger] });
+    verify(await evaluate("window.__battleFixture.dashCooldown > 0 && window.__battleFixture.dashVx > 0"), "Dashing with a second finger follows the held joystick");
+    await page.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await page.send("Emulation.setTouchEmulationEnabled", { enabled: false });
     await page.send("Input.dispatchKeyEvent", { type: "keyDown", key: "j", code: "KeyJ" });
     await page.send("Input.dispatchKeyEvent", { type: "keyDown", key: " ", code: "Space" });
     await waitFor("window.__battleFixture.shots.some(shot => shot.vx < -500)", "aimed shots travel left");
@@ -175,7 +189,7 @@ try {
       verify(await evaluate(`window.__battleFixture.shotsLanded > ${landed}`), `An actual projectile lands to trigger ${expected}`);
       verify(await evaluate("!document.querySelector('.boss-health.enemy') && !/boss (health|damage)|boss hp/i.test(document.querySelector('.boss-hud').textContent)"), `Health stays hidden in ${expected} phase`);
     }
-    await waitFor("document.querySelector('.boss-intro h1')?.textContent.includes('defeated') && !!document.querySelector('.boss-results')", "victory when boss health drops to 0");
+    await waitFor("document.querySelector('.boss-intro h1')?.textContent.toLowerCase().includes('defeated') && !!document.querySelector('.boss-results')", "victory when boss health drops to 0");
     verify(await evaluate("!/boss (health|damage)|boss hp/i.test(document.querySelector('.boss-results').textContent)"), "The results do not reveal the boss's remaining health or damage percentage");
     await capture("boss-results.png");
     await click(".boss-start");

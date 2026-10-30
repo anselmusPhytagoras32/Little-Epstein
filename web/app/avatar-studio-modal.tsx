@@ -14,13 +14,7 @@ import {
   SKIN_TONES,
   loadSavedMascotConfig,
   saveMascotConfig,
-  type Accessory,
-  type Expression,
-  type HairColor,
-  type HairStyle,
-  type JacketColor,
   type MascotAvatarConfig,
-  type SkinTone,
 } from "../lib/avatar-customizer";
 import { useGame } from "./game-provider";
 import type { AvatarAccent, AvatarId } from "../lib/avatars";

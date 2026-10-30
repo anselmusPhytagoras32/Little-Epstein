@@ -76,7 +76,6 @@ export default function AppShell({ children }: { children: ReactNode }) {
   if (!onboardingDone) return <div className="app-shell"><Onboarding onFinish={finishOnboarding} /></div>;
 
   return <div className="app-shell" onClickCapture={navigateOffline}>
-    <AppStartupLoader />
     <a className="skip-link" href="#page-content">Skip to content</a>
     {!game.online && <div className="connection-banner" role="status"><WifiOff size={14}/> Offline. Online check-ins need a connection.</div>}
     <main ref={main} id="page-content" className={`page-main${mapPage ? " is-map" : ""}`} tabIndex={-1}>{children}</main>

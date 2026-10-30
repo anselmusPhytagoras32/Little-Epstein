@@ -71,6 +71,9 @@ jobs:
       - name: Check scheduled game sweep
         run: pnpm sweep
 
+      - name: Check missed days and winners
+        run: node scripts/reconcile-check.mjs
+
       - name: Install Chrome
         id: chrome
         uses: browser-actions/setup-chrome@v2
@@ -101,8 +104,31 @@ jobs:
           cat /tmp/escape-chrome.log
           exit 1
 
+      - name: Check daily rules with a fixed date
+        run: |
+          NODE_OPTIONS=--require=./scripts/test-clock.cjs pnpm exec next start -H 127.0.0.1 -p 3102 > /tmp/escape-clock.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3102/ > /dev/null; then break; fi
+            sleep 1
+          done
+          APP_URL=http://127.0.0.1:3102 node scripts/check-in-check.mjs
+
+      - name: Check session behavior during database outage
+        run: |
+          DATABASE_URL=postgresql://unused@127.0.0.1:55441/unused pnpm exec next start -H 127.0.0.1 -p 3103 > /tmp/escape-outage.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3103/ > /dev/null; then break; fi
+            sleep 1
+          done
+          APP_URL=http://127.0.0.1:3103 node scripts/session-outage-check.mjs
+
       - name: Check onboarding and solo crew
         run: node scripts/onboarding-check.mjs
+
+      - name: Check phone layouts and practice flows
+        run: |
+          UI_CHECK_PWA=1 node scripts/ui-check.mjs
+          node scripts/swim-check.mjs
 
       - name: Check boss fight
         run: node scripts/boss-check.mjs

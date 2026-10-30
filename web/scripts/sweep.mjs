@@ -1,5 +1,6 @@
 import pg from "pg";
 import webpush from "web-push";
+import { reconcileRooms } from "./reconcile-rooms.mjs";
 
 const { Pool } = pg;
 const databaseUrl = process.env.DATABASE_URL;
@@ -12,19 +13,7 @@ if (!databaseUrl) {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
-      await client.query(`UPDATE rooms SET phase='active' WHERE phase='open' AND (now() AT TIME ZONE timezone)::date BETWEEN date '2026-11-01' AND date '2026-11-30'`);
-      const eliminated = await client.query(
-        `UPDATE room_members m SET status='eliminated',eliminated_on=((now() AT TIME ZONE r.timezone)::date-1),eliminated_reason='missed_checkin'
-         FROM rooms r WHERE r.id=m.room_id AND r.phase='active' AND m.status='alive'
-         AND (now() AT TIME ZONE r.timezone)::date > date '2026-11-01'
-         AND NOT EXISTS (SELECT 1 FROM daily_checkins c WHERE c.room_id=r.id AND c.player_id=m.player_id AND c.game_date=((now() AT TIME ZONE r.timezone)::date-1))
-         RETURNING r.id AS room_id,m.player_id,r.timezone,((now() AT TIME ZONE r.timezone)::date-1) AS game_date`,
-      );
-      for (const player of eliminated.rows) {
-        await client.query(`INSERT INTO room_events(room_id,player_id,event_type,game_date) VALUES($1,$2,'eliminated',$3)`,[player.room_id,player.player_id,player.game_date]);
-      }
-      await client.query(`UPDATE room_members m SET status='won' FROM rooms r WHERE r.id=m.room_id AND r.phase='active' AND m.status='alive' AND (now() AT TIME ZONE r.timezone)::date > date '2026-11-30'`);
-      await client.query(`UPDATE rooms SET phase='complete' WHERE phase='active' AND (now() AT TIME ZONE timezone)::date > date '2026-11-30'`);
+      const eliminated = await reconcileRooms(client);
 
       if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY && process.env.VAPID_SUBJECT?.startsWith("mailto:")) {
         const pending = await client.query(
@@ -56,7 +45,7 @@ if (!databaseUrl) {
           }
         }
       } else await client.query("COMMIT");
-      console.log(`Room sweep complete. ${eliminated.rowCount ?? 0} missed check-in${eliminated.rowCount===1?"":"s"} processed.`);
+      console.log(`Room sweep complete. ${eliminated} missed check-in${eliminated===1?"":"s"} processed.`);
     } catch(error) { await client.query("ROLLBACK").catch(()=>{}); throw error; }
     finally { client.release(); }
   } catch(error) {
