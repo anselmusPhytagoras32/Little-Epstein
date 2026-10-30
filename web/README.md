@@ -6,6 +6,8 @@ The route scrolls through all 30 numbered days. The chest at the end opens an in
 
 Local practice has one player and stays on the current device. Practice check-ins, streaks, display name, and reminder preferences persist in browser storage. Sharing an invitation requires an online room. Accounts, multiplayer, room invitations, scheduled eliminations, and background reminders require the services below.
 
+To clear today's local practice check-in, open **Settings → Reset today’s practice log**. This keeps earlier practice days and is unavailable for competitive room check-ins.
+
 Avatar character and accent choices are saved on this device in practice and to the player profile online, where room members can see them on the map. After updating an existing Neon deployment, run `corepack pnpm@10.30.3 db:migrate` before using online accounts; Render runs this migration during pre-deploy.
 
 The `/boss` page offers solo practice and private crew raids against Kirkify, Diddy, and Epstein. Signed-in members of the same room can join a lobby; the host starts the encounter and participants share boss health and see each other's positions. Boss health scales with the number of players present at the start. An endurance shield prevents a knockout before 5, 10, or 15 minutes respectively. Use the move and aim controls on touch (aiming also fires), or WASD/arrow keys to move, IJKL to aim, Space to fire, and Shift to dash. Raids do not change the daily run. Online lobbies require the database migration and a connection; enemy hazards are simulated locally on each device.

@@ -560,6 +560,12 @@ export function GameProvider({ initialNow, children }: { initialNow: string; chi
     setNotice("Your practice island is ready for a fresh start.");
   }
 
+  function resetPracticeDay() {
+    if (mode !== "practice" || practiceEliminated) return;
+    setPracticeDates(current => current.filter(date => date !== day));
+    setNotice("Today's practice check-in was cleared. You can log it again.");
+  }
+
   const loseProgress = useCallback((steps = 1) => {
     if (mode === "online") {
       setNotice(`Gatekeeper Ambush! Your crew took damage and lost ground.`);
@@ -594,7 +600,7 @@ export function GameProvider({ initialNow, children }: { initialNow: string; chi
     streak, bestStreak, checkInCount, checkInDates: mode === "online" ? onlineRoom?.checkedInDays || [] : practiceDates, practiceDay: Math.max(1, checkInCount + (checked ? 0 : 1)),
     checked, busy, events, invitation, notice, installed, setNotice,
     checkIn, reportSlip, createRoom, joinRoom, signIn, register, saveSettings, setAvatar, setAvatarAccent, signOut,
-    sendReaction, copyInvite, enablePush, installApp, refresh, resetPractice, loseProgress, restoreProgress,
+    sendReaction, copyInvite, enablePush, installApp, refresh, resetPractice, resetPracticeDay, loseProgress, restoreProgress,
   };
 
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;

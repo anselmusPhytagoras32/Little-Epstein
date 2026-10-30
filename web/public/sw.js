@@ -1,4 +1,4 @@
-const VERSION = "escape-pwa-v19";
+const VERSION = "escape-pwa-v20";
 const APP_CACHE = `${VERSION}-pages`;
 const ASSET_CACHE = `${VERSION}-assets`;
 const CORE_PAGES = [

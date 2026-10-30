@@ -81,6 +81,7 @@ export type GameContextValue = {
   installApp: () => Promise<void>;
   refresh: () => Promise<void>;
   resetPractice: () => void;
+  resetPracticeDay: () => void;
   loseProgress?: (steps?: number) => void;
   restoreProgress?: (steps?: number) => void;
 };

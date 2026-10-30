@@ -206,6 +206,7 @@ try {
   verify(await evaluate("document.querySelector('.player-detail').textContent.includes('Caught') && document.querySelector('.player-detail').textContent.includes('2/30') && !!document.querySelector('.player-detail .avatar-diver.accent-leaf')"), "Selecting an eliminated swimmer shows the correct avatar and saved progress");
   await navigate("/settings", ".avatar-options");
   await waitFor("document.querySelector('input[name=avatar][value=fern]')?.checked", "online avatar settings load");
+  verify(await evaluate("!document.querySelector('#practice-day-reset')"), "Competitive online players cannot reset a day log");
   await visibleClick(".avatar-option:has(input[value='builder'])");
   await waitFor("document.querySelector('input[name=avatar][value=builder]')?.checked && !document.querySelector('.avatar-options').disabled", "online avatar saves");
   verify(profileWrites >= 1 && onlineAvatar === "builder", "An online character update reaches the profile endpoint");

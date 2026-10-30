@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 // Isolated Chrome context: only synthetic practice data is written.
 const app = new URL(process.env.APP_URL || "http://127.0.0.1:3000");
@@ -59,6 +62,20 @@ try {
   verify(await evaluate("JSON.parse(localStorage.getItem('escape-game-practice-v2')).days.length === 1"), "Practice check-in persists without duplication");
   await navigate("/streak", ".streak-screen");
   verify(await evaluate("document.querySelectorAll('.calendar-date.logged').length === 1"), "The streak calendar shows the saved check-in");
+  await evaluate("(() => {const state=JSON.parse(localStorage.getItem('escape-game-practice-v2'));const today=state.days[0];const yesterday=new Date(Date.parse(today+'T00:00:00Z')-86400000).toISOString().slice(0,10);state.days.unshift(yesterday);localStorage.setItem('escape-game-practice-v2',JSON.stringify(state))})()");
+  await navigate("/settings", ".settings-screen");
+  await click("#practice-day-reset summary");
+  await evaluate("document.querySelector('#practice-day-reset').scrollIntoView({block:'center'})");
+  const artifacts = path.resolve(process.env.UI_ARTIFACT_DIR || fileURLToPath(new URL("../../.impeccable/review/", import.meta.url)));
+  await mkdir(artifacts, { recursive: true });
+  await writeFile(path.join(artifacts, "practice-day-reset.png"), Buffer.from((await page.send("Page.captureScreenshot", { format: "png" })).data, "base64"));
+  await click("#practice-day-reset button");
+  await waitFor("JSON.parse(localStorage.getItem('escape-game-practice-v2')).days.length === 1", "today's practice log reset while earlier days remain");
+  await navigate("/", ".escape-screen");
+  await waitFor("document.querySelector('.dock-primary-cta')?.tagName === 'BUTTON' && !document.querySelector('.dock-primary-cta').disabled", "practice can be checked in again");
+  await click(".dock-primary-cta");
+  await waitFor("JSON.parse(localStorage.getItem('escape-game-practice-v2')).days.length === 2", "practice can be logged again after reset");
+  verify(true, "Practice day reset persists and allows a new check-in");
   await navigate("/report", ".report-screen");
   verify(await evaluate("document.querySelector('.danger-button').disabled"), "Reporting requires confirmation");
   if (process.env.UI_CHECK_PWA === "1") {

@@ -1,0 +1,1 @@
+The escape-boat icon was authored as an SVG for this app. The 192px and 512px PNG icons are rasterized from `escape-app.svg` with the project's `sharp` dependency; the SVG is also used for the browser favicon. The artwork is original vector geometry, not AI-generated artwork.

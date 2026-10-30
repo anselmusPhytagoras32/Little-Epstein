@@ -44,8 +44,12 @@ function assertSameOrigin(request: NextRequest) {
     const source = new URL(origin), destination = new URL(request.url);
     // Next can normalize 127.0.0.1 to localhost internally. Still require
     // the browser's exact Host and protocol when accepting a loopback origin.
-    const localHost = (source.hostname === "127.0.0.1" || source.hostname === "localhost") && source.host === request.headers.get("host") && source.protocol === destination.protocol;
-    if (source.origin !== destination.origin && !localHost) throw new RequestError("Refresh the page and try again.", 403);
+    const host = request.headers.get("host");
+    const localHost = (source.hostname === "127.0.0.1" || source.hostname === "localhost") && source.host === host && source.protocol === destination.protocol;
+    // Render terminates TLS before forwarding to Next. Trust only the exact
+    // request Host, never X-Forwarded-Host supplied by a client.
+    const proxiedHttps = source.protocol === "https:" && source.host === host && request.headers.get("x-forwarded-proto")?.trim().toLowerCase() === "https";
+    if (source.origin !== destination.origin && !localHost && !proxiedHttps) throw new RequestError("Refresh the page and try again.", 403);
   }
   if (request.headers.get("sec-fetch-site") === "cross-site") throw new RequestError("Refresh the page and try again.", 403);
   if (request.headers.get("content-type")?.split(";")[0].trim() !== "application/json") throw new RequestError("Send this form again from the game.", 415);

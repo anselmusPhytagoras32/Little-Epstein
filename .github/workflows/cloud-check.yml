@@ -104,6 +104,18 @@ jobs:
           cat /tmp/escape-chrome.log
           exit 1
 
+      - name: Check registration origin handling
+        run: node scripts/auth-origin-check.mjs
+
+      - name: Check registration behind HTTPS proxy
+        run: |
+          TEST_CLOCK=2026-10-30T12:00:00Z NODE_OPTIONS=--require=./scripts/test-clock.cjs pnpm exec next start -H 127.0.0.1 -p 3104 > /tmp/escape-register.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3104/ > /dev/null; then break; fi
+            sleep 1
+          done
+          APP_URL=http://127.0.0.1:3104 node scripts/register-check.mjs
+
       - name: Check daily rules with a fixed date
         run: |
           NODE_OPTIONS=--require=./scripts/test-clock.cjs pnpm exec next start -H 127.0.0.1 -p 3102 > /tmp/escape-clock.log 2>&1 &
